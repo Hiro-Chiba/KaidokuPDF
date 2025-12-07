@@ -1,4 +1,4 @@
-"""画像ベースPDFからテキストを抽出するCLIスクリプト。"""
+"""画像PDFからテキストだけを抽出するCLI。"""
 
 from __future__ import annotations
 
@@ -8,30 +8,38 @@ from pathlib import Path
 from image_pdf_ocr import OCRConversionError, extract_text_to_file
 
 
-def main() -> None:
+def _create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="画像ベースのPDFからOCRでテキストを抽出します。",
+        description="画像ベースのPDFをOCRしてテキストファイルに保存します。",
         formatter_class=argparse.RawTextHelpFormatter,
     )
     parser.add_argument(
         "--pdf_path",
         type=Path,
         required=True,
-        help='入力するPDFファイルのパス。\n例: "C:/Users/YourUser/Documents/scan.pdf"',
+        help="テキストを抽出したいPDF。例: C:/Users/YourUser/Documents/scan.pdf",
     )
     parser.add_argument(
         "--output_path",
         type=Path,
         required=True,
-        help='抽出したテキストを保存するパス。\n例: "C:/Users/YourUser/Documents/output.txt"',
+        help="抽出結果を保存するテキストファイル。例: C:/Users/YourUser/Documents/output.txt",
     )
+    return parser
 
+
+def _run_extraction(pdf_path: Path, output_path: Path) -> None:
+    extract_text_to_file(pdf_path, output_path)
+
+
+def main() -> None:
+    parser = _create_parser()
     args = parser.parse_args()
 
     try:
-        extract_text_to_file(args.pdf_path, args.output_path)
+        _run_extraction(args.pdf_path, args.output_path)
     except FileNotFoundError as exc:
-        parser.error(str(exc))
+        parser.error(f"ファイルが見つかりません: {exc}")
     except OCRConversionError as exc:
         parser.error(str(exc))
 
