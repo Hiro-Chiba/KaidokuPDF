@@ -1,4 +1,4 @@
-"""画像PDF向けOCRユーティリティ。"""
+"""画像PDFを扱うためのOCRユーティリティ集。"""
 
 from .ocr import (
     create_searchable_pdf,
