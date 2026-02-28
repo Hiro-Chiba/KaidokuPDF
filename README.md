@@ -14,14 +14,38 @@
   - `tesseract -v` が動かない場合は `TESSERACT_CMD`/`TESSERACT_PATH` でパスを指定
   - 日本語フォント（Noto Sans CJKなど）をインストールするとPDFの文字化けを防げます。特定フォントを使いたい場合は `OCR_JPN_FONT` でファイルパスを指定
 
+### Tesseract-OCR のインストール
+
+**macOS:**
+```bash
+brew install tesseract tesseract-lang
+```
+
+**Ubuntu/Debian:**
+```bash
+sudo apt install tesseract-ocr tesseract-ocr-jpn
+```
+
+**Windows:**
+
+[UB Mannheim のインストーラー](https://github.com/UB-Mannheim/tesseract/wiki) からダウンロードし、インストール時に日本語データを選択してください。
+
 ## セットアップ
+
+### uv（推奨）
+```bash
+uv sync
+```
+
+### pip
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
-pip install -r requirements.txt
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -e .
 ```
 
 ## 使い方
+
 ### デスクトップアプリ（おすすめ）
 ```bash
 python ocr_desktop_app.py
@@ -33,12 +57,37 @@ python ocr_desktop_app.py
 ### CLI
 検索可能PDFを作成:
 ```bash
-python convert_to_searchable_pdf.py --input_path 入力.pdf --output_path 出力.pdf
+kaidoku-convert --input_path 入力.pdf --output_path 出力.pdf
 ```
 
 テキストを抽出:
 ```bash
-python extract_text_from_pdf.py --pdf_path 入力.pdf --output_path 出力.txt
+kaidoku-extract --pdf_path 入力.pdf --output_path 出力.txt
+```
+
+## 開発
+
+### セットアップ
+```bash
+uv sync --group dev
+uv run pre-commit install
+```
+
+### Lint / Format
+```bash
+uv run ruff check .        # lint
+uv run ruff check . --fix  # lint + 自動修正
+uv run ruff format .       # フォーマット
+```
+
+### テスト
+```bash
+uv run pytest
+```
+
+### Pre-commit
+```bash
+uv run pre-commit run --all-files
 ```
 
 ## よくある問題

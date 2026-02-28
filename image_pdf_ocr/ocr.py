@@ -7,16 +7,16 @@ import math
 import os
 import sys
 import time
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from shutil import which
 from threading import Event
-from typing import Callable, Iterable, Sequence, Tuple, Union
 
 import fitz  # type: ignore
-import pytesseract
 import pandas as pd
+import pytesseract
 from PIL import Image, ImageOps
-from shutil import which
 
 
 class OCRConversionError(RuntimeError):
@@ -29,6 +29,8 @@ class OCRCancelledError(RuntimeError):
 
 class PDFPasswordRemovalError(RuntimeError):
     """PDFのパスワード解除に失敗したことを示す例外。"""
+
+
 _AVERAGE_CONFIDENCE_THRESHOLD = float(os.environ.get("OCR_CONFIDENCE_THRESHOLD", "65"))
 _TEXT_RENDER_CONFIDENCE_THRESHOLD = 50.0
 _UPSCALE_FACTOR = 1.5
@@ -172,7 +174,7 @@ def _filter_frame_by_confidence(frame: pd.DataFrame, threshold: float) -> pd.Dat
     return filtered
 
 
-def _preprocess_for_ocr(image: Image.Image) -> Tuple[Image.Image, float]:
+def _preprocess_for_ocr(image: Image.Image) -> tuple[Image.Image, float]:
     """OCR精度向上のための前処理（拡大＋二値化）を適用する。"""
 
     grayscale = image.convert("L")
@@ -189,7 +191,7 @@ def _preprocess_for_ocr(image: Image.Image) -> Tuple[Image.Image, float]:
     return binary, scale
 
 
-def _extract_coordinates(row: pd.Series) -> Tuple[float | None, float | None, float | None]:
+def _extract_coordinates(row: pd.Series) -> tuple[float | None, float | None, float | None]:
     """DataFrameの1行から座標情報を抽出する。"""
 
     try:
@@ -211,7 +213,7 @@ def _format_duration(seconds: float) -> str:
     if not math.isfinite(seconds):
         return "不明"
 
-    total_seconds = max(0, int(round(seconds)))
+    total_seconds = max(0, round(seconds))
     minutes, sec = divmod(total_seconds, 60)
     hours, minutes = divmod(minutes, 60)
 
@@ -236,8 +238,8 @@ def _build_progress_message(current: int, total: int, start_time: float) -> str:
 
 
 def remove_pdf_password(
-    input_path: Union[str, Path],
-    output_path: Union[str, Path],
+    input_path: str | Path,
+    output_path: str | Path,
     password: str,
 ) -> None:
     """パスワード保護されたPDFからパスワードを解除して保存する。
@@ -436,17 +438,17 @@ def find_and_set_tesseract_path() -> bool:
         return True
 
     cmd_from_path = which("tesseract")
-    if cmd_from_path and _set_cmd_if_exists(Path(cmd_from_path)):
-        if _validate_tesseract_setting():
-            return True
+    if cmd_from_path and _set_cmd_if_exists(Path(cmd_from_path)) and _validate_tesseract_setting():
+        return True
 
     # Windows向けの既定インストールパスをチェック
     path_64 = Path(r"C:\\Program Files\\Tesseract-OCR\\tesseract.exe")
     path_32 = Path(r"C:\\Program Files (x86)\\Tesseract-OCR\\tesseract.exe")
 
-    if _set_cmd_if_exists(path_64) or _set_cmd_if_exists(path_32):
-        if _validate_tesseract_setting():
-            return True
+    if (
+        _set_cmd_if_exists(path_64) or _set_cmd_if_exists(path_32)
+    ) and _validate_tesseract_setting():
+        return True
 
     # PyInstaller等で配布する際に同梱した`tesseract.exe`を探索
     candidate_roots: list[Path] = []
@@ -474,14 +476,16 @@ def find_and_set_tesseract_path() -> bool:
 
 
 def create_searchable_pdf(
-    input_path: Union[str, os.PathLike],
-    output_path: Union[str, os.PathLike],
+    input_path: str | os.PathLike,
+    output_path: str | os.PathLike,
     progress_callback: Callable[[str], None] | None = None,
     cancel_event: Event | None = None,
 ) -> None:
     """画像PDFをOCRして検索可能なPDFを生成する。"""
     if not find_and_set_tesseract_path():
-        raise OCRConversionError("Tesseract-OCRが見つかりません。インストールとPATH設定を確認してください。")
+        raise OCRConversionError(
+            "Tesseract-OCRが見つかりません。インストールとPATH設定を確認してください。"
+        )
 
     input_path = Path(input_path)
     output_path = Path(output_path)
@@ -615,8 +619,8 @@ def _normalize_image_for_canvas(
         scale = 1.0
 
     new_size = (
-        max(1, int(round(width * scale))),
-        max(1, int(round(height * scale))),
+        max(1, round(width * scale)),
+        max(1, round(height * scale)),
     )
 
     if new_size != (width, height):
@@ -634,8 +638,8 @@ def _normalize_image_for_canvas(
 
 
 def create_searchable_pdf_from_images(
-    image_paths: Sequence[Union[str, os.PathLike]],
-    output_path: Union[str, os.PathLike],
+    image_paths: Sequence[str | os.PathLike],
+    output_path: str | os.PathLike,
     progress_callback: Callable[[int, int, str], None] | None = None,
     preview_callback: Callable[[int, int, Image.Image], None] | None = None,
     cancel_event: Event | None = None,
@@ -691,9 +695,7 @@ def create_searchable_pdf_from_images(
             _check_cancellation()
 
             with Image.open(path) as raw_image:
-                prepared_image = _normalize_image_for_canvas(
-                    raw_image, target_width, target_height
-                )
+                prepared_image = _normalize_image_for_canvas(raw_image, target_width, target_height)
 
             _dispatch_preview(index, prepared_image.copy())
 
@@ -749,16 +751,13 @@ def create_searchable_pdf_from_images(
         ) from exc
     except Exception as exc:
         output_doc.close()
-        raise OCRConversionError(
-            f"画像からPDFを生成中に問題が発生しました: {exc}"
-        ) from exc
+        raise OCRConversionError(f"画像からPDFを生成中に問題が発生しました: {exc}") from exc
     else:
         output_doc.close()
 
 
-
 def extract_text_from_image_pdf(
-    input_path: Union[str, os.PathLike],
+    input_path: str | os.PathLike,
     progress_callback: Callable[[str], None] | None = None,
     cancel_event: Event | None = None,
 ) -> str:
@@ -792,6 +791,7 @@ def extract_text_from_image_pdf(
         _dispatch_progress("ページが存在しないPDFです。処理を終了します。")
         document.close()
         return "\n"
+
     def _check_cancellation() -> None:
         if cancel_event and cancel_event.is_set():
             raise OCRCancelledError("処理がキャンセルされました。")
@@ -821,8 +821,8 @@ def extract_text_from_image_pdf(
 
 
 def extract_text_to_file(
-    input_path: Union[str, os.PathLike],
-    output_path: Union[str, os.PathLike],
+    input_path: str | os.PathLike,
+    output_path: str | os.PathLike,
     progress_callback: Callable[[str], None] | None = None,
     cancel_event: Event | None = None,
 ) -> None:
@@ -857,9 +857,7 @@ def _prepare_output_path(path: Path) -> None:
         if parent and not parent.exists():
             parent.mkdir(parents=True, exist_ok=True)
     except Exception as exc:  # pragma: no cover - filesystem permissions vary
-        raise OCRConversionError(
-            f"出力先ディレクトリを作成できませんでした: {exc}"
-        ) from exc
+        raise OCRConversionError(f"出力先ディレクトリを作成できませんでした: {exc}") from exc
 
     if path.exists() and path.is_dir():
         raise OCRConversionError(f"出力パスがディレクトリを指しています: {path}")

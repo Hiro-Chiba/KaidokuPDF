@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import threading
-from pathlib import Path
-from typing import Callable
-
 import tkinter as tk
+from collections.abc import Callable
+from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from tkinter.scrolledtext import ScrolledText
+
+from PIL import Image, ImageTk
 
 from image_pdf_ocr import (
     OCRCancelledError,
@@ -19,13 +20,12 @@ from image_pdf_ocr import (
     extract_text_to_file,
     remove_pdf_password,
 )
-from PIL import Image, ImageTk
 
 
 class ProcessingWorkspace:
     """単一のOCR処理画面を構築・管理する。"""
 
-    def __init__(self, app: "OCRDesktopApp", parent: tk.Widget) -> None:
+    def __init__(self, app: OCRDesktopApp, parent: tk.Widget) -> None:
         self.root = app.master
         self.frame = tk.Frame(parent)
 
@@ -107,9 +107,7 @@ class ProcessingWorkspace:
         self.output_pdf_frame = tk.LabelFrame(left_frame, text="検索可能PDFの保存先")
         self.output_pdf_frame.pack(fill=tk.X, pady=(0, 8))
 
-        self.output_pdf_entry = tk.Entry(
-            self.output_pdf_frame, textvariable=self.output_pdf_path
-        )
+        self.output_pdf_entry = tk.Entry(self.output_pdf_frame, textvariable=self.output_pdf_path)
         self.output_pdf_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(12, 6), pady=8)
 
         self.browse_output_pdf_btn = tk.Button(
@@ -159,9 +157,7 @@ class ProcessingWorkspace:
         text_radio.pack(anchor=tk.W, padx=12, pady=(0, 8))
         self.mode_buttons.append(text_radio)
 
-        self.mode_hint_var.set(
-            "検索可能なPDFを作成します。保存先を確認してから実行してください。"
-        )
+        self.mode_hint_var.set("検索可能なPDFを作成します。保存先を確認してから実行してください。")
         self.mode_hint_label = tk.Label(
             left_frame,
             textvariable=self.mode_hint_var,
@@ -308,13 +304,8 @@ class ProcessingWorkspace:
             if busy:
                 self.clear_log_btn.configure(state=tk.DISABLED)
             else:
-                has_log = bool(
-                    self.log_widget
-                    and self.log_widget.get("1.0", tk.END).strip()
-                )
-                self.clear_log_btn.configure(
-                    state=tk.NORMAL if has_log else tk.DISABLED
-                )
+                has_log = bool(self.log_widget and self.log_widget.get("1.0", tk.END).strip())
+                self.clear_log_btn.configure(state=tk.NORMAL if has_log else tk.DISABLED)
         if self.progress:
             if busy:
                 self.progress.start(10)
@@ -433,13 +424,9 @@ class ProcessingWorkspace:
         else:
             self._log("検索可能PDFの作成が完了しました。")
             self._notify(
-                lambda: messagebox.showinfo(
-                    "完了", f"検索可能なPDFを保存しました:\n{output_path}"
-                )
+                lambda: messagebox.showinfo("完了", f"検索可能なPDFを保存しました:\n{output_path}")
             )
-            self._notify(
-                lambda: self._update_status("検索可能PDFの作成が完了しました。")
-            )
+            self._notify(lambda: self._update_status("検索可能PDFの作成が完了しました。"))
 
     def _extract_task(self, input_path: Path, output_path: Path) -> None:
         self._log(f"テキストを抽出中: {output_path}")
@@ -473,13 +460,9 @@ class ProcessingWorkspace:
         else:
             self._log("テキスト抽出が完了しました。")
             self._notify(
-                lambda: messagebox.showinfo(
-                    "完了", f"テキストを保存しました:\n{output_path}"
-                )
+                lambda: messagebox.showinfo("完了", f"テキストを保存しました:\n{output_path}")
             )
-            self._notify(
-                lambda: self._update_status("テキスト抽出が完了しました。")
-            )
+            self._notify(lambda: self._update_status("テキスト抽出が完了しました。"))
 
     # --- UI補助 ---------------------------------------------------------
     def _update_mode_dependent_widgets(self) -> None:
@@ -599,7 +582,7 @@ class ProcessingWorkspace:
 class PDFPasswordRemovalWorkspace:
     """PDFのパスワード解除画面を構築・管理する。"""
 
-    def __init__(self, app: "OCRDesktopApp", parent: tk.Widget) -> None:
+    def __init__(self, app: OCRDesktopApp, parent: tk.Widget) -> None:
         self.root = app.master
         self.frame = tk.Frame(parent)
 
@@ -618,7 +601,9 @@ class PDFPasswordRemovalWorkspace:
 
         self._create_widgets()
 
-    def pack(self, *, fill: str, expand: bool, padx: tuple[int, int], pady: tuple[int, int]) -> None:
+    def pack(
+        self, *, fill: str, expand: bool, padx: tuple[int, int], pady: tuple[int, int]
+    ) -> None:
         self.frame.pack(fill=fill, expand=expand, padx=padx, pady=pady)
 
     def _create_widgets(self) -> None:
@@ -670,9 +655,7 @@ class PDFPasswordRemovalWorkspace:
         )
         self.remove_btn.pack(side=tk.LEFT, padx=(0, 6))
 
-        self.clear_btn = tk.Button(
-            button_frame, text="画面をクリア", command=self._clear_workspace
-        )
+        self.clear_btn = tk.Button(button_frame, text="画面をクリア", command=self._clear_workspace)
         self.clear_btn.pack(side=tk.LEFT, padx=6)
 
         status_frame = tk.LabelFrame(left_frame, text="進行状況")
@@ -777,9 +760,7 @@ class PDFPasswordRemovalWorkspace:
 
         self._set_busy(True)
         self._update_status("パスワードを解除しています…")
-        self._append_log(
-            f"処理開始: {input_path} → {output_path}"
-        )
+        self._append_log(f"処理開始: {input_path} → {output_path}")
         self._run_in_thread(
             lambda: self._remove_task(
                 input_path=input_path, output_path=output_path, password=password
@@ -803,10 +784,11 @@ class PDFPasswordRemovalWorkspace:
         except (FileNotFoundError, ValueError, PDFPasswordRemovalError) as exc:
             message = str(exc)
             self._notify(lambda msg=message: self._handle_failure(msg))
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             message = f"予期しないエラーが発生しました: {exc}"
             self._notify(lambda msg=message: self._handle_failure(msg))
         else:
+
             def on_success() -> None:
                 self._append_log(f"完了: {output_path}")
                 messagebox.showinfo(
@@ -860,13 +842,12 @@ class PDFPasswordRemovalWorkspace:
         self._clear_log()
 
 
-
 class ImagesToPDFWorkspace:
     """画像から検索可能PDFを生成するための作業画面。"""
 
     _preview_max_size = (480, 640)
 
-    def __init__(self, app: "OCRDesktopApp", parent: tk.Widget) -> None:
+    def __init__(self, app: OCRDesktopApp, parent: tk.Widget) -> None:
         self.root = app.master
         self.frame = tk.Frame(parent)
 
@@ -906,12 +887,14 @@ class ImagesToPDFWorkspace:
         self._ocr_started = False
         self._suspend_output_trace = False
 
-        self.output_path.trace_add('write', lambda *_args: self._on_output_path_changed())
+        self.output_path.trace_add("write", lambda *_args: self._on_output_path_changed())
 
         self._create_widgets()
 
     # --- ライフサイクル -------------------------------------------------
-    def pack(self, *, fill: str, expand: bool, padx: tuple[int, int], pady: tuple[int, int]) -> None:
+    def pack(
+        self, *, fill: str, expand: bool, padx: tuple[int, int], pady: tuple[int, int]
+    ) -> None:
         self.frame.pack(fill=fill, expand=expand, padx=padx, pady=pady)
 
     def prepare_for_destroy(self) -> None:
@@ -948,13 +931,17 @@ class ImagesToPDFWorkspace:
 
         self.add_btn = tk.Button(list_btn_frame, text="画像を追加", command=self._add_images)
         self.add_btn.pack(side=tk.LEFT, padx=2)
-        self.remove_btn = tk.Button(list_btn_frame, text="選択を削除", command=self._remove_selected)
+        self.remove_btn = tk.Button(
+            list_btn_frame, text="選択を削除", command=self._remove_selected
+        )
         self.remove_btn.pack(side=tk.LEFT, padx=2)
         self.up_btn = tk.Button(list_btn_frame, text="上へ", command=self._move_up)
         self.up_btn.pack(side=tk.LEFT, padx=2)
         self.down_btn = tk.Button(list_btn_frame, text="下へ", command=self._move_down)
         self.down_btn.pack(side=tk.LEFT, padx=2)
-        self.clear_list_btn = tk.Button(list_btn_frame, text="一覧をクリア", command=self._clear_images)
+        self.clear_list_btn = tk.Button(
+            list_btn_frame, text="一覧をクリア", command=self._clear_images
+        )
         self.clear_list_btn.pack(side=tk.LEFT, padx=2)
 
         output_frame = tk.LabelFrame(left_frame, text="検索可能PDFの保存先")
@@ -963,7 +950,9 @@ class ImagesToPDFWorkspace:
         output_entry = tk.Entry(output_frame, textvariable=self.output_path)
         output_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(12, 6), pady=8)
 
-        self.browse_btn = tk.Button(output_frame, text="保存先", width=10, command=self._select_output_path)
+        self.browse_btn = tk.Button(
+            output_frame, text="保存先", width=10, command=self._select_output_path
+        )
         self.browse_btn.pack(side=tk.LEFT, padx=(0, 12), pady=8)
 
         steps_frame = tk.LabelFrame(left_frame, text="進行チェック")
@@ -977,15 +966,19 @@ class ImagesToPDFWorkspace:
         )
         for index, (label, var) in enumerate(step_labels):
             chk = tk.Checkbutton(steps_frame, text=label, variable=var, state=tk.DISABLED)
-            chk.grid(row=index // 2, column=index % 2, padx=12, pady=4, sticky='w')
+            chk.grid(row=index // 2, column=index % 2, padx=12, pady=4, sticky="w")
 
         button_frame = tk.Frame(left_frame)
         button_frame.pack(fill=tk.X, pady=(0, 8))
 
-        self.convert_btn = tk.Button(button_frame, text="検索可能PDFを生成", command=self._start_conversion)
+        self.convert_btn = tk.Button(
+            button_frame, text="検索可能PDFを生成", command=self._start_conversion
+        )
         self.convert_btn.pack(side=tk.LEFT, padx=(0, 6))
 
-        self.cancel_btn = tk.Button(button_frame, text="キャンセル", state=tk.DISABLED, command=self._cancel_running_task)
+        self.cancel_btn = tk.Button(
+            button_frame, text="キャンセル", state=tk.DISABLED, command=self._cancel_running_task
+        )
         self.cancel_btn.pack(side=tk.LEFT, padx=6)
 
         self.clear_btn = tk.Button(button_frame, text="画面をクリア", command=self._clear_workspace)
@@ -1019,14 +1012,19 @@ class ImagesToPDFWorkspace:
         )
         self.preview_label.pack(fill=tk.BOTH, expand=True, padx=12, pady=(12, 6))
 
-        preview_info_label = tk.Label(preview_frame, textvariable=self.preview_info_var, anchor=tk.W)
+        preview_info_label = tk.Label(
+            preview_frame, textvariable=self.preview_info_var, anchor=tk.W
+        )
         preview_info_label.pack(fill=tk.X, padx=12, pady=(0, 12))
 
     # --- ファイル操作 ---------------------------------------------------
     def _add_images(self) -> None:
         file_paths = filedialog.askopenfilenames(
             title="画像ファイルを選択",
-            filetypes=(("画像ファイル", "*.png *.jpg *.jpeg *.tif *.tiff *.bmp"), ("すべてのファイル", "*.*")),
+            filetypes=(
+                ("画像ファイル", "*.png *.jpg *.jpeg *.tif *.tiff *.bmp"),
+                ("すべてのファイル", "*.*"),
+            ),
         )
         if not file_paths:
             return
@@ -1231,7 +1229,7 @@ class ImagesToPDFWorkspace:
             message = str(exc)
             self._log(f"エラー: {message}")
             self._handle_failure(message)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             self._log(f"予期しないエラー: {exc}")
             self._handle_failure("変換中に予期しないエラーが発生しました。ログを確認してください。")
         else:
@@ -1240,9 +1238,7 @@ class ImagesToPDFWorkspace:
             def _on_success() -> None:
                 self.step_vars["save"].set(True)
                 self._update_status("変換が完了しました。")
-                messagebox.showinfo(
-                    "完了", f"検索可能なPDFを保存しました:\n{output_path}"
-                )
+                messagebox.showinfo("完了", f"検索可能なPDFを保存しました:\n{output_path}")
 
             self._notify(_on_success)
 
@@ -1418,9 +1414,7 @@ class OCRDesktopApp:
         self.notebook.add(self.password_tab, text="PDFパスワード解除")
 
         self.password_workspace = PDFPasswordRemovalWorkspace(self, self.password_tab)
-        self.password_workspace.pack(
-            fill=tk.BOTH, expand=True, padx=(12, 12), pady=(12, 12)
-        )
+        self.password_workspace.pack(fill=tk.BOTH, expand=True, padx=(12, 12), pady=(12, 12))
 
         self.notebook.bind("<<NotebookTabChanged>>", self._on_tab_changed)
 
@@ -1471,7 +1465,9 @@ class OCRDesktopApp:
         for workspace in self.workspaces:
             workspace._log(message)
             workspace._update_status("UIで予期しないエラーが発生しました。ログをご確認ください。")
-        messagebox.showerror("UIエラー", "予期しないUIエラーが発生しました。ログを確認してください。")
+        messagebox.showerror(
+            "UIエラー", "予期しないUIエラーが発生しました。ログを確認してください。"
+        )
 
     def _on_tab_changed(self, _event: object | None = None) -> None:
         if self._is_ocr_tab_selected():
@@ -1512,7 +1508,7 @@ class OCRDesktopApp:
 
 def main() -> None:
     root = tk.Tk()
-    app = OCRDesktopApp(root)
+    OCRDesktopApp(root)
     root.mainloop()
 
 
