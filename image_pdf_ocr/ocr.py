@@ -1,13 +1,13 @@
-"""OCR機能を提供するモジュール（後方互換 re-export レイヤー）。"""
+"""OCR機能を提供するモジュール（後方互換 re-export レイヤー）。
 
-from ._engine import (
-    _ALLOWED_TESSERACT_FLAGS,
+注意: このモジュールの公開APIは __all__ に列挙されたシンボルのみです。
+プライベート関数・定数（_で始まるもの）はインポート可能ですが、
+将来のバージョンで変更・削除される可能性があります。
+"""
+
+from ._engine import (  # noqa: F401
     _AVERAGE_CONFIDENCE_THRESHOLD,
     _EARLY_STOP_CONFIDENCE,
-    _OCR_BASE_CONFIG,
-    _OCR_PSM_CANDIDATES,
-    _SHELL_META_CHARS,
-    _TEXT_RENDER_CONFIDENCE_THRESHOLD,
     _UPSCALE_FACTOR,
     AdaptiveOCRResult,
     _build_tesseract_configs,
@@ -20,34 +20,24 @@ from ._engine import (
     _run_ocr_with_best_config,
     _sanitize_tesseract_config,
 )
-from ._environment import (
-    _FONT_PATH_CACHE,
+from ._environment import (  # noqa: F401
     _candidate_font_directories,
     _find_japanese_font_path,
-    _try_assign_candidates,
-    _validate_tesseract_setting,
     find_and_set_tesseract_path,
 )
-from ._exceptions import OCRCancelledError, OCRConversionError, PDFPasswordRemovalError
-from ._parallel import (
-    _get_max_workers,
-    _is_parallel_enabled,
-    _ocr_worker,
-    _ocr_worker_with_text,
-    _worker_initializer,
-    run_parallel_ocr,
-    run_parallel_ocr_with_text,
+from ._exceptions import (
+    OCRCancelledError,
+    OCRConversionError,
+    PDFPasswordRemovalError,
 )
 from ._pdf import (
-    _determine_canvas_size,
-    _normalize_image_for_canvas,
     create_searchable_pdf,
     create_searchable_pdf_from_images,
     extract_text_from_image_pdf,
     extract_text_to_file,
     remove_pdf_password,
 )
-from ._utils import (
+from ._utils import (  # noqa: F401
     _build_progress_message,
     _extract_coordinates,
     _format_duration,
@@ -55,49 +45,14 @@ from ._utils import (
 )
 
 __all__ = [
-    "_ALLOWED_TESSERACT_FLAGS",
-    "_AVERAGE_CONFIDENCE_THRESHOLD",
-    "_EARLY_STOP_CONFIDENCE",
-    "_FONT_PATH_CACHE",
-    "_OCR_BASE_CONFIG",
-    "_OCR_PSM_CANDIDATES",
-    "_SHELL_META_CHARS",
-    "_TEXT_RENDER_CONFIDENCE_THRESHOLD",
-    "_UPSCALE_FACTOR",
     "AdaptiveOCRResult",
     "OCRCancelledError",
     "OCRConversionError",
     "PDFPasswordRemovalError",
-    "_build_progress_message",
-    "_build_tesseract_configs",
-    "_candidate_font_directories",
-    "_compute_average_confidence",
-    "_determine_canvas_size",
-    "_extract_coordinates",
-    "_filter_frame_by_confidence",
-    "_find_japanese_font_path",
-    "_format_duration",
-    "_get_max_workers",
-    "_image_to_data",
-    "_is_parallel_enabled",
-    "_normalize_image_for_canvas",
-    "_ocr_worker",
-    "_ocr_worker_with_text",
-    "_perform_adaptive_ocr",
-    "_prepare_frame",
-    "_prepare_output_path",
-    "_preprocess_for_ocr",
-    "_run_ocr_with_best_config",
-    "_sanitize_tesseract_config",
-    "_try_assign_candidates",
-    "_validate_tesseract_setting",
-    "_worker_initializer",
     "create_searchable_pdf",
     "create_searchable_pdf_from_images",
     "extract_text_from_image_pdf",
     "extract_text_to_file",
     "find_and_set_tesseract_path",
     "remove_pdf_password",
-    "run_parallel_ocr",
-    "run_parallel_ocr_with_text",
 ]

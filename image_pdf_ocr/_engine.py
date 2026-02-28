@@ -53,6 +53,9 @@ def _sanitize_tesseract_config(raw: str) -> str:
 
 
 _EARLY_STOP_CONFIDENCE = 90.0
+_BINARIZE_THRESHOLD = 180
+_PDF_RENDER_DPI = 300
+_POINTS_PER_INCH = 72
 _OCR_BASE_CONFIG = _sanitize_tesseract_config(os.environ.get("OCR_TESSERACT_CONFIG", "--oem 1"))
 
 
@@ -80,13 +83,16 @@ def _build_tesseract_configs() -> tuple[str, ...]:
     return tuple(dict.fromkeys(configs))
 
 
+_TESSERACT_CONFIGS = _build_tesseract_configs()
+
+
 def _run_ocr_with_best_config(image: Image.Image) -> tuple[pd.DataFrame, float]:
     """複数設定でOCRを実行し、平均信頼度が最も高い結果を返す。"""
 
     best_frame: pd.DataFrame | None = None
     best_average = -1.0
 
-    for config in _build_tesseract_configs():
+    for config in _TESSERACT_CONFIGS:
         frame = _image_to_data(image, config=config)
         average = _compute_average_confidence(frame)
         if average > best_average:
@@ -201,6 +207,5 @@ def _preprocess_for_ocr(image: Image.Image) -> tuple[Image.Image, float]:
         resized = grayscale
 
     enhanced = ImageOps.autocontrast(resized)
-    threshold = 180
-    binary = enhanced.point(lambda x: 255 if x > threshold else 0, mode="L")
+    binary = enhanced.point(lambda x: 255 if x > _BINARIZE_THRESHOLD else 0, mode="L")
     return binary, scale

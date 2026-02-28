@@ -73,6 +73,14 @@ class TestExtractTextFromImagePdf:
         assert isinstance(text, str)
         assert len(text) > 0
 
+    def test_ocr_accuracy_minimum(self, sample_image_pdf):
+        """OCR結果に最低限のキーワードが含まれることを検証する。"""
+        text = extract_text_from_image_pdf(sample_image_pdf)
+        lower = text.lower()
+        assert "hello" in lower or "world" in lower or "12345" in lower, (
+            f"OCR結果にキーワードが見つかりません: {text[:200]}"
+        )
+
 
 @requires_tesseract
 class TestExtractTextToFile:
@@ -82,3 +90,10 @@ class TestExtractTextToFile:
         assert output.exists()
         content = output.read_text(encoding="utf-8")
         assert len(content) > 0
+
+    def test_output_contains_text(self, tmp_path, sample_image_pdf):
+        """保存されたファイルにOCR結果のキーワードが含まれることを検証する。"""
+        output = tmp_path / "extracted_accuracy.txt"
+        extract_text_to_file(sample_image_pdf, output)
+        content = output.read_text(encoding="utf-8").lower()
+        assert "hello" in content or "world" in content or "12345" in content

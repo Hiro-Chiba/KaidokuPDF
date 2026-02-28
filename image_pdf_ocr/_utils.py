@@ -13,13 +13,15 @@ if TYPE_CHECKING:
     import pandas as pd
 
 
-def _extract_coordinates(row: pd.Series) -> tuple[float | None, float | None, float | None]:
-    """DataFrameの1行から座標情報を抽出する。"""
+def _extract_coordinates(
+    row: pd.Series | dict,
+) -> tuple[float | None, float | None, float | None]:
+    """DataFrameの1行またはdictから座標情報を抽出する。"""
 
     try:
-        x = float(row.get("left"))
-        y = float(row.get("top"))
-        h = float(row.get("height"))
+        x = float(row.get("left"))  # type: ignore[arg-type]
+        y = float(row.get("top"))  # type: ignore[arg-type]
+        h = float(row.get("height"))  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None, None, None
 

@@ -7,6 +7,7 @@ from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from threading import Event
 
+import pandas as pd
 from PIL import Image
 
 from ._engine import (
@@ -17,11 +18,6 @@ from ._engine import (
 )
 from ._environment import find_and_set_tesseract_path
 from ._exceptions import OCRCancelledError
-
-try:
-    import pytesseract
-except ImportError:  # pragma: no cover
-    pytesseract = None  # type: ignore[assignment]
 
 
 def _get_max_workers() -> int:
@@ -59,14 +55,67 @@ def _ocr_worker(image: Image.Image) -> tuple[AdaptiveOCRResult, list[dict]]:
     return ocr_result, filtered.to_dict("records")
 
 
+def _reconstruct_text_from_frame(frame: pd.DataFrame) -> str:
+    """OCR結果のDataFrameからテキストを再構築する。
+
+    block_num/par_num/line_num の変化でブロック・段落・行の区切りを判定し、
+    適切な改行を挿入する。
+    """
+    if frame.empty or "text" not in frame.columns:
+        return ""
+
+    lines: list[str] = []
+    current_line_words: list[str] = []
+    prev_block = -1
+    prev_par = -1
+    prev_line = -1
+
+    for _, row in frame.iterrows():
+        text_val = str(row.get("text", "")).strip()
+        conf = row.get("conf", -1)
+        try:
+            conf = float(conf)
+        except (TypeError, ValueError):
+            conf = -1.0
+        if conf < 0 or not text_val:
+            continue
+
+        block = row.get("block_num", -1)
+        par = row.get("par_num", -1)
+        line = row.get("line_num", -1)
+
+        if prev_block != -1 and (block != prev_block or par != prev_par):
+            if current_line_words:
+                lines.append(" ".join(current_line_words))
+                current_line_words = []
+            lines.append("")  # blank line between blocks/paragraphs
+        elif prev_line != -1 and line != prev_line:
+            if current_line_words:
+                lines.append(" ".join(current_line_words))
+                current_line_words = []
+
+        current_line_words.append(text_val)
+        prev_block = block
+        prev_par = par
+        prev_line = line
+
+    if current_line_words:
+        lines.append(" ".join(current_line_words))
+
+    return "\n".join(lines)
+
+
 def _ocr_worker_with_text(image: Image.Image) -> tuple[AdaptiveOCRResult, str]:
     """OCR + テキスト抽出を実行する。
+
+    image_to_data の結果からテキストを再構築することで、
+    二重OCR（image_to_data + image_to_string）を排除する。
 
     Returns:
         (ocr_result, page_text) のタプル。
     """
     ocr_result = _perform_adaptive_ocr(image)
-    page_text = pytesseract.image_to_string(ocr_result.image_for_string, lang="jpn")
+    page_text = _reconstruct_text_from_frame(ocr_result.frame)
     return ocr_result, page_text
 
 

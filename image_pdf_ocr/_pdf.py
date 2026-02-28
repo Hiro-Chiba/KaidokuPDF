@@ -13,10 +13,14 @@ import fitz  # type: ignore
 import pytesseract
 from PIL import Image, ImageOps
 
+from ._engine import _PDF_RENDER_DPI, _POINTS_PER_INCH
 from ._environment import _find_japanese_font_path, find_and_set_tesseract_path
 from ._exceptions import OCRCancelledError, OCRConversionError, PDFPasswordRemovalError
-from ._parallel import run_parallel_ocr, run_parallel_ocr_with_text
-from ._utils import _build_progress_message, _prepare_output_path
+from ._parallel import _get_max_workers, run_parallel_ocr, run_parallel_ocr_with_text
+from ._utils import _build_progress_message, _extract_coordinates, _prepare_output_path
+
+# Decompression Bomb 対策: 200メガピクセルまで許可（デフォルト約178MP）
+Image.MAX_IMAGE_PIXELS = 200_000_000
 
 
 def remove_pdf_password(
@@ -111,63 +115,68 @@ def create_searchable_pdf(
             raise OCRCancelledError("処理がキャンセルされました。")
 
     try:
-        # Phase A: 全ページの画像抽出（メインプロセス）
-        pil_images: list[Image.Image] = []
-        pixmaps: list[fitz.Pixmap] = []
-        page_rects: list[fitz.Rect] = []
+        chunk_size = max(1, _get_max_workers())
+        completed_pages = 0
 
-        for page in input_doc:
-            _check_cancellation()
-            pix = page.get_pixmap(dpi=300)
-            pixmaps.append(pix)
-            page_rects.append(page.rect)
-            image_bytes = io.BytesIO(pix.tobytes("ppm"))
-            pil_image = Image.open(image_bytes)
-            pil_images.append(pil_image.copy())
-            pil_image.close()
+        for chunk_start in range(0, total_pages, chunk_size):
+            chunk_end = min(chunk_start + chunk_size, total_pages)
+
+            # Phase A: チャンク分のページ画像抽出
+            pil_images: list[Image.Image] = []
+            pixmaps: list[fitz.Pixmap] = []
+            page_rects: list[fitz.Rect] = []
+
+            for page_idx in range(chunk_start, chunk_end):
+                _check_cancellation()
+                page = input_doc[page_idx]
+                pix = page.get_pixmap(dpi=_PDF_RENDER_DPI)
+                pixmaps.append(pix)
+                page_rects.append(page.rect)
+                image_bytes = io.BytesIO(pix.tobytes("ppm"))
+                pil_image = Image.open(image_bytes)
+                pil_images.append(pil_image.copy())
+                pil_image.close()
+
+            # Phase B: チャンク分の並列OCR
+            def _ocr_progress(completed: int, total: int, _base: int = completed_pages) -> None:
+                message = _build_progress_message(_base + completed, total_pages, start_time)
+                _dispatch_progress(message)
+
+            ocr_results = run_parallel_ocr(
+                pil_images, cancel_event=cancel_event, progress_callback=_ocr_progress
+            )
+            completed_pages += len(pil_images)
+
+            # Phase C: チャンク結果をPDF組み立て
+            for (_ocr_result, filtered_rows), pix, rect in zip(
+                ocr_results, pixmaps, page_rects, strict=True
+            ):
+                _check_cancellation()
+                new_page = output_doc.new_page(width=rect.width, height=rect.height)
+                new_page.insert_image(rect, pixmap=pix)
+
+                for row in filtered_rows:
+                    text_val = str(row.get("text", "")).strip()
+                    if not text_val:
+                        continue
+                    x, y, h = _extract_coordinates(row)
+                    if x is None or y is None or h is None:
+                        continue
+                    try:
+                        new_page.insert_text(
+                            (x, y + h),
+                            text_val,
+                            fontfile=str(font_path),
+                            fontsize=h * 0.8,
+                            render_mode=3,
+                        )
+                    except RuntimeError:
+                        continue
+
+            # チャンク処理完了後にメモリ解放
+            del pil_images, pixmaps, page_rects, ocr_results
 
         input_doc.close()
-
-        # Phase B: 並列OCR
-        def _ocr_progress(completed: int, total: int) -> None:
-            message = _build_progress_message(completed, total_pages, start_time)
-            _dispatch_progress(message)
-
-        ocr_results = run_parallel_ocr(
-            pil_images, cancel_event=cancel_event, progress_callback=_ocr_progress
-        )
-
-        # Phase C: 結果をページ順にPDF組み立て（メインプロセス）
-        for (_ocr_result, filtered_rows), pix, rect in zip(
-            ocr_results, pixmaps, page_rects, strict=True
-        ):
-            _check_cancellation()
-            new_page = output_doc.new_page(width=rect.width, height=rect.height)
-            new_page.insert_image(rect, pixmap=pix)
-
-            for row in filtered_rows:
-                text_val = str(row.get("text", "")).strip()
-                if not text_val:
-                    continue
-                x = row.get("left")
-                y = row.get("top")
-                h = row.get("height")
-                if x is None or y is None or h is None:
-                    continue
-                try:
-                    x, y, h = float(x), float(y), float(h)
-                except (TypeError, ValueError):
-                    continue
-                try:
-                    new_page.insert_text(
-                        (x, y + h),
-                        text_val,
-                        fontfile=str(font_path),
-                        fontsize=h * 0.8,
-                        render_mode=3,
-                    )
-                except RuntimeError:
-                    continue
     except OCRCancelledError:
         raise
     except (fitz.FileDataError, fitz.FileNotFoundError) as exc:
@@ -335,11 +344,10 @@ def create_searchable_pdf_from_images(
         )
 
         # Phase C: 結果をページ順にPDF組み立て（メインプロセス）
-        dpi = 300
-        width_pt = target_width * 72 / dpi
-        height_pt = target_height * 72 / dpi
+        width_pt = target_width * _POINTS_PER_INCH / _PDF_RENDER_DPI
+        height_pt = target_height * _POINTS_PER_INCH / _PDF_RENDER_DPI
         page_rect = fitz.Rect(0, 0, width_pt, height_pt)
-        coordinate_scale = 72 / dpi
+        coordinate_scale = _POINTS_PER_INCH / _PDF_RENDER_DPI
 
         for (_ocr_result, filtered_rows), prepared_image in zip(
             ocr_results, prepared_images, strict=True
@@ -348,21 +356,15 @@ def create_searchable_pdf_from_images(
             page = output_doc.new_page(width=width_pt, height=height_pt)
 
             image_buffer = io.BytesIO()
-            prepared_image.save(image_buffer, format="PNG")
+            prepared_image.save(image_buffer, format="PPM")
             page.insert_image(page_rect, stream=image_buffer.getvalue())
 
             for row in filtered_rows:
                 text_val = str(row.get("text", "")).strip()
                 if not text_val:
                     continue
-                x = row.get("left")
-                y = row.get("top")
-                h = row.get("height")
+                x, y, h = _extract_coordinates(row)
                 if x is None or y is None or h is None:
-                    continue
-                try:
-                    x, y, h = float(x), float(y), float(h)
-                except (TypeError, ValueError):
                     continue
                 try:
                     page.insert_text(
@@ -439,30 +441,42 @@ def extract_text_from_image_pdf(
             raise OCRCancelledError("処理がキャンセルされました。")
 
     try:
-        # Phase A: 全ページの画像抽出（メインプロセス）
-        pil_images: list[Image.Image] = []
-        for page in document:
-            _check_cancellation()
-            pix = page.get_pixmap(dpi=300)
-            image_bytes = io.BytesIO(pix.tobytes("ppm"))
-            pil_image = Image.open(image_bytes)
-            pil_images.append(pil_image.copy())
-            pil_image.close()
+        chunk_size = max(1, _get_max_workers())
+        completed_pages = 0
+        page_index = 0
+
+        for chunk_start in range(0, total_pages, chunk_size):
+            chunk_end = min(chunk_start + chunk_size, total_pages)
+
+            # Phase A: チャンク分のページ画像抽出
+            pil_images: list[Image.Image] = []
+            for page_idx in range(chunk_start, chunk_end):
+                _check_cancellation()
+                page = document[page_idx]
+                pix = page.get_pixmap(dpi=_PDF_RENDER_DPI)
+                image_bytes = io.BytesIO(pix.tobytes("ppm"))
+                pil_image = Image.open(image_bytes)
+                pil_images.append(pil_image.copy())
+                pil_image.close()
+
+            # Phase B: チャンク分の並列OCR + テキスト抽出
+            def _ocr_progress(completed: int, total: int, _base: int = completed_pages) -> None:
+                message = _build_progress_message(_base + completed, total_pages, start_time)
+                _dispatch_progress(message)
+
+            ocr_results = run_parallel_ocr_with_text(
+                pil_images, cancel_event=cancel_event, progress_callback=_ocr_progress
+            )
+            completed_pages += len(pil_images)
+
+            # Phase C: ページ順にテキスト結合
+            for _ocr_result, page_text in ocr_results:
+                page_index += 1
+                texts.append(f"--- ページ {page_index} ---\n{page_text.strip()}\n")
+
+            del pil_images, ocr_results
 
         document.close()
-
-        # Phase B: 並列OCR + テキスト抽出
-        def _ocr_progress(completed: int, total: int) -> None:
-            message = _build_progress_message(completed, total_pages, start_time)
-            _dispatch_progress(message)
-
-        ocr_results = run_parallel_ocr_with_text(
-            pil_images, cancel_event=cancel_event, progress_callback=_ocr_progress
-        )
-
-        # Phase C: ページ順にテキスト結合
-        for index, (_ocr_result, page_text) in enumerate(ocr_results, start=1):
-            texts.append(f"--- ページ {index} ---\n{page_text.strip()}\n")
     except OCRCancelledError:
         raise
     except (fitz.FileDataError, fitz.FileNotFoundError) as exc:

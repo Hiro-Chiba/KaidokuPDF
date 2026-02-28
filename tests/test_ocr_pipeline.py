@@ -79,8 +79,8 @@ class TestRunOcrWithBestConfig:
 
         assert mock_itd.call_count == 1
 
-    @patch("image_pdf_ocr._engine._build_tesseract_configs", return_value=())
-    def test_no_configs_returns_empty(self, _mock_btc: MagicMock) -> None:
+    @patch("image_pdf_ocr._engine._TESSERACT_CONFIGS", ())
+    def test_no_configs_returns_empty(self) -> None:
         """設定が空の場合は空DataFrameと0.0を返す。"""
         image = Image.new("RGB", (100, 100), "white")
         frame, average = _run_ocr_with_best_config(image)

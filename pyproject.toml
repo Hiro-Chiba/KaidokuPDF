@@ -17,13 +17,14 @@ dependencies = [
 ]
 
 [project.scripts]
-kaidoku-convert = "convert_to_searchable_pdf:main"
-kaidoku-extract = "extract_text_from_pdf:main"
+kaidoku-convert = "image_pdf_ocr._cli_convert:main"
+kaidoku-extract = "image_pdf_ocr._cli_extract:main"
 
 [dependency-groups]
 dev = [
     "ruff",
     "pytest",
+    "pytest-cov",
     "pre-commit",
 ]
 
@@ -40,6 +41,7 @@ ignore = ["RUF001", "RUF002", "RUF003"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+addopts = "--cov=image_pdf_ocr --cov-report=term-missing"
 markers = [
     "skipif: conditionally skip tests",
 ]

@@ -90,23 +90,30 @@ class TestOcrWorker:
 
 
 class TestOcrWorkerWithText:
-    @patch("image_pdf_ocr._parallel.pytesseract")
     @patch("image_pdf_ocr._parallel._perform_adaptive_ocr")
-    def test_returns_result_and_text(self, mock_ocr, mock_pytesseract):
-        dummy_frame = pd.DataFrame({"text": ["hello"], "conf": [90.0]})
+    def test_returns_result_and_text(self, mock_ocr):
+        dummy_frame = pd.DataFrame(
+            {
+                "text": ["hello", "world"],
+                "conf": [90.0, 85.0],
+                "block_num": [1, 1],
+                "par_num": [1, 1],
+                "line_num": [1, 1],
+            }
+        )
         mock_ocr.return_value = AdaptiveOCRResult(
             frame=dummy_frame,
             average_confidence=90.0,
             image_for_string=Image.new("RGB", (10, 10)),
             used_preprocessing=False,
         )
-        mock_pytesseract.image_to_string.return_value = "extracted text"
 
         img = Image.new("RGB", (100, 100))
         result, text = _ocr_worker_with_text(img)
 
         assert isinstance(result, AdaptiveOCRResult)
-        assert text == "extracted text"
+        assert "hello" in text
+        assert "world" in text
 
 
 class TestRunParallelOcr:

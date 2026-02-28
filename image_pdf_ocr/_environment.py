@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
 from collections.abc import Iterable
 from pathlib import Path
 from shutil import which
@@ -13,6 +14,9 @@ import pytesseract
 from ._exceptions import OCRConversionError
 
 _FONT_PATH_CACHE: Path | None = None
+_FONT_PATH_CACHE_LOCK = threading.Lock()
+_ALLOWED_FONT_EXTENSIONS = frozenset({".ttf", ".ttc", ".otf", ".otc"})
+_MAX_FONT_SEARCH_FILES = 10_000
 
 
 def _find_japanese_font_path() -> Path:
@@ -20,14 +24,16 @@ def _find_japanese_font_path() -> Path:
 
     global _FONT_PATH_CACHE
 
-    if _FONT_PATH_CACHE and _FONT_PATH_CACHE.exists():
-        return _FONT_PATH_CACHE
+    with _FONT_PATH_CACHE_LOCK:
+        if _FONT_PATH_CACHE and _FONT_PATH_CACHE.exists():
+            return _FONT_PATH_CACHE
 
     env_font = os.environ.get("OCR_JPN_FONT")
     if env_font:
         font_path = Path(env_font).expanduser()
-        if font_path.exists():
-            _FONT_PATH_CACHE = font_path
+        if font_path.exists() and font_path.suffix.lower() in _ALLOWED_FONT_EXTENSIONS:
+            with _FONT_PATH_CACHE_LOCK:
+                _FONT_PATH_CACHE = font_path
             return font_path
 
     candidate_files = [
@@ -67,17 +73,20 @@ def _find_japanese_font_path() -> Path:
         for name in candidate_files:
             path = directory / name
             if path.exists():
-                _FONT_PATH_CACHE = path
+                with _FONT_PATH_CACHE_LOCK:
+                    _FONT_PATH_CACHE = path
                 return path
 
     for directory in directories:
         if not directory.exists():
             continue
         for pattern in candidate_patterns:
-            matches = sorted(directory.rglob(pattern))
-            for match in matches:
-                if match.is_file():
-                    _FONT_PATH_CACHE = match
+            for file_count, match in enumerate(sorted(directory.rglob(pattern)), start=1):
+                if file_count > _MAX_FONT_SEARCH_FILES:
+                    break
+                if match.is_file() and match.suffix.lower() in _ALLOWED_FONT_EXTENSIONS:
+                    with _FONT_PATH_CACHE_LOCK:
+                        _FONT_PATH_CACHE = match
                     return match
 
     raise OCRConversionError(

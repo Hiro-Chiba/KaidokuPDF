@@ -1,11 +1,14 @@
-"""E2Eテスト — CLIスクリプトをサブプロセスで実行（Tesseract必須）。"""
+"""E2Eテスト — CLIスクリプトをサブプロセスで実行。"""
 
 from __future__ import annotations
 
 import subprocess
 import sys
+from pathlib import Path
 
 from .conftest import requires_tesseract
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 @requires_tesseract
@@ -15,10 +18,10 @@ class TestConvertToSearchablePdfCli:
         result = subprocess.run(
             [
                 sys.executable,
-                "convert_to_searchable_pdf.py",
-                "--input_path",
+                str(_REPO_ROOT / "convert_to_searchable_pdf.py"),
+                "--input",
                 str(sample_image_pdf),
-                "--output_path",
+                "--output",
                 str(output),
             ],
             capture_output=True,
@@ -29,14 +32,15 @@ class TestConvertToSearchablePdfCli:
         assert output.exists()
 
     def test_missing_input_file(self, tmp_path):
+        """存在しないファイルを指定した場合のエラーテスト（Tesseract不要）。"""
         output = tmp_path / "cli_output.pdf"
         result = subprocess.run(
             [
                 sys.executable,
-                "convert_to_searchable_pdf.py",
-                "--input_path",
+                str(_REPO_ROOT / "convert_to_searchable_pdf.py"),
+                "--input",
                 str(tmp_path / "nonexistent.pdf"),
-                "--output_path",
+                "--output",
                 str(output),
             ],
             capture_output=True,
@@ -53,10 +57,10 @@ class TestExtractTextFromPdfCli:
         result = subprocess.run(
             [
                 sys.executable,
-                "extract_text_from_pdf.py",
-                "--pdf_path",
+                str(_REPO_ROOT / "extract_text_from_pdf.py"),
+                "--input",
                 str(sample_image_pdf),
-                "--output_path",
+                "--output",
                 str(output),
             ],
             capture_output=True,
@@ -69,14 +73,15 @@ class TestExtractTextFromPdfCli:
         assert len(content) > 0
 
     def test_missing_input_file(self, tmp_path):
+        """存在しないファイルを指定した場合のエラーテスト（Tesseract不要）。"""
         output = tmp_path / "cli_extracted.txt"
         result = subprocess.run(
             [
                 sys.executable,
-                "extract_text_from_pdf.py",
-                "--pdf_path",
+                str(_REPO_ROOT / "extract_text_from_pdf.py"),
+                "--input",
                 str(tmp_path / "nonexistent.pdf"),
-                "--output_path",
+                "--output",
                 str(output),
             ],
             capture_output=True,
