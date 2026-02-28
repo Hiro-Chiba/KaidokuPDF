@@ -1,5 +1,6 @@
 """画像PDFを扱うためのOCRユーティリティ集。"""
 
+from ._engine import AdaptiveOCRResult
 from ._environment import find_and_set_tesseract_path
 from ._exceptions import OCRCancelledError, OCRConversionError, PDFPasswordRemovalError
 from ._pdf import (
@@ -11,6 +12,7 @@ from ._pdf import (
 )
 
 __all__ = [
+    "AdaptiveOCRResult",
     "OCRCancelledError",
     "OCRConversionError",
     "PDFPasswordRemovalError",

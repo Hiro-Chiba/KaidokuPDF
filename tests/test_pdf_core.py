@@ -57,8 +57,8 @@ class TestCreateSearchablePdf:
 
         assert output.parent.exists()
 
-    def test_empty_pdf_progress_message(self, tmp_path: Path) -> None:
-        """0ページPDFの進捗メッセージが送信される。"""
+    def test_empty_pdf_progress_message_and_save(self, tmp_path: Path) -> None:
+        """0ページPDFの進捗メッセージが送信され、saveが呼ばれてreturnする。"""
         from image_pdf_ocr._pdf import create_searchable_pdf
 
         input_file = tmp_path / "input.pdf"
@@ -87,6 +87,7 @@ class TestCreateSearchablePdf:
             create_searchable_pdf(input_file, output, progress_callback=progress_messages.append)
 
         assert any("ページが存在しない" in msg for msg in progress_messages)
+        mock_output_doc.save.assert_called_once()
 
     def test_cancel_event_raises(self, tmp_path: Path) -> None:
         """キャンセルでOCRCancelledError。"""

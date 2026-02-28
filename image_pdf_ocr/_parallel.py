@@ -110,14 +110,16 @@ def _ocr_worker_bytes(image_data: bytes) -> tuple[AdaptiveOCRResult, list[dict]]
     """バイト列から画像を復元してOCR + 信頼度フィルタリングを実行する。"""
     with io.BytesIO(image_data) as buf:
         image = Image.open(buf)
-        return _ocr_worker(image)
+        image.load()
+    return _ocr_worker(image)
 
 
 def _ocr_worker_with_text_bytes(image_data: bytes) -> tuple[AdaptiveOCRResult, str]:
     """バイト列から画像を復元してOCR + テキスト抽出を実行する。"""
     with io.BytesIO(image_data) as buf:
         image = Image.open(buf)
-        return _ocr_worker_with_text(image)
+        image.load()
+    return _ocr_worker_with_text(image)
 
 
 def _ocr_worker_with_text(image: Image.Image) -> tuple[AdaptiveOCRResult, str]:
@@ -233,7 +235,9 @@ def _run_with_pool(
     results: dict[int, object] = {}
     completed_count = 0
 
-    bytes_worker = _BYTES_WORKER_MAP[worker_fn]
+    bytes_worker = _BYTES_WORKER_MAP.get(worker_fn)
+    if bytes_worker is None:
+        raise ValueError(f"未登録のworker関数です: {worker_fn}")
 
     with ProcessPoolExecutor(max_workers=max_workers, initializer=_worker_initializer) as executor:
         future_to_index = {

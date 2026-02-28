@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 
-class OCRConversionError(RuntimeError):
+class OCRConversionError(Exception):
     """OCR変換処理で発生した例外。"""
 
 
-class OCRCancelledError(RuntimeError):
+class OCRCancelledError(Exception):
     """ユーザーによって処理がキャンセルされたことを示す例外。"""
 
 
-class PDFPasswordRemovalError(RuntimeError):
+class PDFPasswordRemovalError(Exception):
     """PDFのパスワード解除に失敗したことを示す例外。"""

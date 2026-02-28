@@ -23,6 +23,14 @@ from ._utils import _build_progress_message, _extract_coordinates, _prepare_outp
 Image.MAX_IMAGE_PIXELS = 200_000_000
 
 
+def _pixmap_to_pil(pix: fitz.Pixmap) -> Image.Image:
+    """PixmapをPIL画像に変換する（コピー済み、buf非依存）。"""
+    with io.BytesIO(pix.tobytes("ppm")) as buf:
+        img = Image.open(buf)
+        img.load()
+        return img
+
+
 def _extract_page_images(
     doc: fitz.Document,
     start: int,
@@ -36,10 +44,7 @@ def _extract_page_images(
             raise OCRCancelledError("処理がキャンセルされました。")
         page = doc[page_idx]
         pix = page.get_pixmap(dpi=_PDF_RENDER_DPI)
-        with io.BytesIO(pix.tobytes("ppm")) as image_bytes:
-            pil_image = Image.open(image_bytes)
-            images.append(pil_image.copy())
-            pil_image.close()
+        images.append(_pixmap_to_pil(pix))
     return images
 
 
@@ -60,10 +65,7 @@ def _extract_page_images_with_meta(
         pix = page.get_pixmap(dpi=_PDF_RENDER_DPI)
         pixmaps.append(pix)
         page_rects.append(page.rect)
-        with io.BytesIO(pix.tobytes("ppm")) as image_bytes:
-            pil_image = Image.open(image_bytes)
-            images.append(pil_image.copy())
-            pil_image.close()
+        images.append(_pixmap_to_pil(pix))
     return images, pixmaps, page_rects
 
 
@@ -157,6 +159,8 @@ def create_searchable_pdf(
 
             if total_pages == 0:
                 _dispatch_progress("ページが存在しないPDFです。処理を終了します。")
+                output_doc.save(output_path, garbage=4, deflate=True, clean=True)
+                return
 
             chunk_size = max(1, _get_max_workers())
             completed_pages = 0

@@ -10,9 +10,12 @@ import pandas as pd
 import pytesseract
 from PIL import Image, ImageOps
 
-_AVERAGE_CONFIDENCE_THRESHOLD = max(
-    0.0, min(100.0, float(os.environ.get("OCR_CONFIDENCE_THRESHOLD", "65")))
-)
+try:
+    _AVERAGE_CONFIDENCE_THRESHOLD = max(
+        0.0, min(100.0, float(os.environ.get("OCR_CONFIDENCE_THRESHOLD", "65")))
+    )
+except (ValueError, TypeError):
+    _AVERAGE_CONFIDENCE_THRESHOLD = 65.0
 _TEXT_RENDER_CONFIDENCE_THRESHOLD = 50.0
 _UPSCALE_FACTOR = 1.5
 _OCR_PSM_CANDIDATES = tuple(

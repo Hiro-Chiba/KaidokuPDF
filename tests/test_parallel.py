@@ -14,10 +14,14 @@ from image_pdf_ocr._engine import AdaptiveOCRResult
 from image_pdf_ocr._exceptions import OCRCancelledError
 from image_pdf_ocr._parallel import (
     _get_max_workers,
+    _image_to_bytes,
     _is_parallel_enabled,
     _ocr_worker,
+    _ocr_worker_bytes,
     _ocr_worker_with_text,
+    _ocr_worker_with_text_bytes,
     _run_sequential,
+    _run_with_pool,
     _worker_initializer,
     run_parallel_ocr,
     run_parallel_ocr_with_text,
@@ -266,3 +270,61 @@ class TestPoolFallback:
 
         assert len(results) == 2
         mock_seq.assert_called_once()
+
+
+class TestOcrWorkerBytes:
+    @patch("image_pdf_ocr._parallel._perform_adaptive_ocr")
+    @patch("image_pdf_ocr._parallel._filter_frame_by_confidence")
+    def test_returns_result_from_bytes(self, mock_filter, mock_ocr):
+        dummy_frame = pd.DataFrame({"text": ["hello"], "conf": [90.0]})
+        mock_ocr.return_value = AdaptiveOCRResult(
+            frame=dummy_frame,
+            average_confidence=90.0,
+            image_for_string=Image.new("RGB", (10, 10)),
+            used_preprocessing=False,
+        )
+        mock_filter.return_value = dummy_frame
+
+        img = Image.new("RGB", (50, 50))
+        image_bytes = _image_to_bytes(img)
+        result, rows = _ocr_worker_bytes(image_bytes)
+
+        assert isinstance(result, AdaptiveOCRResult)
+        assert len(rows) == 1
+
+
+class TestOcrWorkerWithTextBytes:
+    @patch("image_pdf_ocr._parallel._perform_adaptive_ocr")
+    def test_returns_result_from_bytes(self, mock_ocr):
+        dummy_frame = pd.DataFrame(
+            {
+                "text": ["hello"],
+                "conf": [90.0],
+                "block_num": [1],
+                "par_num": [1],
+                "line_num": [1],
+            }
+        )
+        mock_ocr.return_value = AdaptiveOCRResult(
+            frame=dummy_frame,
+            average_confidence=90.0,
+            image_for_string=Image.new("RGB", (10, 10)),
+            used_preprocessing=False,
+        )
+
+        img = Image.new("RGB", (50, 50))
+        image_bytes = _image_to_bytes(img)
+        result, text = _ocr_worker_with_text_bytes(image_bytes)
+
+        assert isinstance(result, AdaptiveOCRResult)
+        assert "hello" in text
+
+
+class TestRunWithPool:
+    def test_unknown_worker_raises_value_error(self):
+        def fake_worker(img):
+            pass  # pragma: no cover
+
+        images = [Image.new("RGB", (50, 50))]
+        with pytest.raises(ValueError, match="未登録のworker関数"):
+            _run_with_pool(images, fake_worker, None, None)
