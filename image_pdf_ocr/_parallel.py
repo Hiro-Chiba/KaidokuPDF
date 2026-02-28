@@ -217,9 +217,9 @@ _BYTES_WORKER_MAP: dict[Callable, Callable] = {
 
 
 def _image_to_bytes(image: Image.Image) -> bytes:
-    """PIL ImageをPPMバイト列に変換する（pickle回避用）。"""
+    """PIL ImageをPNGバイト列に変換する（pickle回避用）。"""
     with io.BytesIO() as buf:
-        image.save(buf, format="PPM")
+        image.save(buf, format="PNG")
         return buf.getvalue()
 
 

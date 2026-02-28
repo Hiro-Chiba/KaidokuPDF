@@ -34,6 +34,9 @@ jobs:
       - name: Security scan (bandit)
         run: uv run bandit -r image_pdf_ocr -c pyproject.toml
 
+      - name: Type check (mypy)
+        run: uv run mypy image_pdf_ocr/
+
       - name: Dependency audit (pip-audit)
         run: uv run pip-audit
 

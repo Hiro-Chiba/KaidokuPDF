@@ -96,6 +96,17 @@ uv run pytest
 uv run pre-commit run --all-files
 ```
 
+## 環境変数
+
+| 変数名 | 説明 | デフォルト |
+|--------|------|----------|
+| `TESSERACT_CMD` | Tesseract実行ファイルのパス | 自動検出 |
+| `OCR_JPN_FONT` | 日本語フォントファイルのパス | 自動検出 |
+| `OCR_JPN_FONT_DIR` | フォント探索ディレクトリ | 自動検出 |
+| `OCR_CONFIDENCE_THRESHOLD` | OCR信頼度の閾値（0〜100） | 65.0 |
+| `KAIDOKU_OCR_WORKERS` | 並列OCRワーカー数 | CPU数 // 2 |
+| `KAIDOKU_PARALLEL` | 並列処理の有効化（`0`で無効） | 1 |
+
 ## よくある問題
 - 「Tesseract-OCRが見つかりません」: TesseractのインストールとPATH設定を確認し、必要なら環境変数でパスを指定
 - 「need font file or buffer」: 日本語フォントをインストールし、`OCR_JPN_FONT` でフォントファイルを指す

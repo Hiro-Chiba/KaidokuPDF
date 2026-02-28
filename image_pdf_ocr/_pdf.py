@@ -209,9 +209,6 @@ def create_searchable_pdf(
                         except RuntimeError:
                             continue
 
-                # チャンク処理完了後にメモリ解放
-                del pil_images, pixmaps, page_rects, ocr_results
-
             _check_cancellation()
 
             try:
@@ -421,9 +418,6 @@ def create_searchable_pdf_from_images(
                         except RuntimeError:
                             continue
 
-                # チャンク処理完了後にメモリ解放
-                del prepared_images, ocr_results
-
             _check_cancellation()
             output_doc.save(output_path, garbage=4, deflate=True, clean=True)
     except OCRCancelledError:
@@ -506,8 +500,6 @@ def extract_text_from_image_pdf(
                 for _ocr_result, page_text in ocr_results:
                     page_index += 1
                     texts.append(f"--- ページ {page_index} ---\n{page_text.strip()}\n")
-
-                del pil_images, ocr_results
 
         _check_cancellation()
 
