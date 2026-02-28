@@ -31,24 +31,6 @@ class TestConvertToSearchablePdfCli:
         assert result.returncode == 0, f"stderr: {result.stderr}"
         assert output.exists()
 
-    def test_missing_input_file(self, tmp_path):
-        """存在しないファイルを指定した場合のエラーテスト（Tesseract不要）。"""
-        output = tmp_path / "cli_output.pdf"
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(_REPO_ROOT / "convert_to_searchable_pdf.py"),
-                "--input",
-                str(tmp_path / "nonexistent.pdf"),
-                "--output",
-                str(output),
-            ],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        assert result.returncode != 0
-
 
 @requires_tesseract
 class TestExtractTextFromPdfCli:
@@ -72,20 +54,40 @@ class TestExtractTextFromPdfCli:
         content = output.read_text(encoding="utf-8")
         assert len(content) > 0
 
-    def test_missing_input_file(self, tmp_path):
-        """存在しないファイルを指定した場合のエラーテスト（Tesseract不要）。"""
-        output = tmp_path / "cli_extracted.txt"
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(_REPO_ROOT / "extract_text_from_pdf.py"),
-                "--input",
-                str(tmp_path / "nonexistent.pdf"),
-                "--output",
-                str(output),
-            ],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        assert result.returncode != 0
+
+def test_convert_missing_input_file(tmp_path):
+    """Tesseract不要 — 存在しないファイル指定時のエラーテスト。"""
+    output = tmp_path / "cli_output.pdf"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(_REPO_ROOT / "convert_to_searchable_pdf.py"),
+            "--input",
+            str(tmp_path / "nonexistent.pdf"),
+            "--output",
+            str(output),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode != 0
+
+
+def test_extract_missing_input_file(tmp_path):
+    """Tesseract不要 — 存在しないファイル指定時のエラーテスト。"""
+    output = tmp_path / "cli_extracted.txt"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(_REPO_ROOT / "extract_text_from_pdf.py"),
+            "--input",
+            str(tmp_path / "nonexistent.pdf"),
+            "--output",
+            str(output),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode != 0

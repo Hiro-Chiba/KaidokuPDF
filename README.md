@@ -57,12 +57,18 @@ python ocr_desktop_app.py
 ### CLI
 検索可能PDFを作成:
 ```bash
-kaidoku-convert --input_path 入力.pdf --output_path 出力.pdf
+kaidoku-convert --input 入力.pdf --output 出力.pdf
 ```
 
 テキストを抽出:
 ```bash
-kaidoku-extract --pdf_path 入力.pdf --output_path 出力.txt
+kaidoku-extract --input 入力.pdf --output 出力.txt
+```
+
+バージョン確認:
+```bash
+kaidoku-convert --version
+kaidoku-extract --version
 ```
 
 ## 開発

@@ -202,7 +202,7 @@ def _preprocess_for_ocr(image: Image.Image) -> tuple[Image.Image, float]:
     scale = _UPSCALE_FACTOR
     if scale != 1.0:
         new_size = (int(grayscale.width * scale), int(grayscale.height * scale))
-        resized = grayscale.resize(new_size, Image.LANCZOS)
+        resized = grayscale.resize(new_size, Image.LANCZOS)  # type: ignore[attr-defined]
     else:
         resized = grayscale
 

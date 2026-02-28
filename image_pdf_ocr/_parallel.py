@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import os
 from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -105,6 +106,18 @@ def _reconstruct_text_from_frame(frame: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
+def _ocr_worker_bytes(image_data: bytes) -> tuple[AdaptiveOCRResult, list[dict]]:
+    """バイト列から画像を復元してOCR + 信頼度フィルタリングを実行する。"""
+    image = Image.open(io.BytesIO(image_data))
+    return _ocr_worker(image)
+
+
+def _ocr_worker_with_text_bytes(image_data: bytes) -> tuple[AdaptiveOCRResult, str]:
+    """バイト列から画像を復元してOCR + テキスト抽出を実行する。"""
+    image = Image.open(io.BytesIO(image_data))
+    return _ocr_worker_with_text(image)
+
+
 def _ocr_worker_with_text(image: Image.Image) -> tuple[AdaptiveOCRResult, str]:
     """OCR + テキスト抽出を実行する。
 
@@ -193,6 +206,19 @@ def _run_sequential(
     return results
 
 
+_BYTES_WORKER_MAP: dict[Callable, Callable] = {
+    _ocr_worker: _ocr_worker_bytes,
+    _ocr_worker_with_text: _ocr_worker_with_text_bytes,
+}
+
+
+def _image_to_bytes(image: Image.Image) -> bytes:
+    """PIL ImageをPPMバイト列に変換する（pickle回避用）。"""
+    buf = io.BytesIO()
+    image.save(buf, format="PPM")
+    return buf.getvalue()
+
+
 def _run_with_pool(
     images: list[Image.Image],
     worker_fn: Callable,
@@ -205,8 +231,13 @@ def _run_with_pool(
     results: dict[int, object] = {}
     completed_count = 0
 
+    bytes_worker = _BYTES_WORKER_MAP[worker_fn]
+
     with ProcessPoolExecutor(max_workers=max_workers, initializer=_worker_initializer) as executor:
-        future_to_index = {executor.submit(worker_fn, img): idx for idx, img in enumerate(images)}
+        future_to_index = {
+            executor.submit(bytes_worker, _image_to_bytes(img)): idx
+            for idx, img in enumerate(images)
+        }
 
         for future in as_completed(future_to_index):
             if cancel_event and cancel_event.is_set():

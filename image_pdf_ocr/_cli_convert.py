@@ -3,18 +3,12 @@
 from __future__ import annotations
 
 import argparse
-import importlib.metadata
+import sys
 from pathlib import Path
 
 from ._exceptions import OCRConversionError
 from ._pdf import create_searchable_pdf
-
-
-def _get_version() -> str:
-    try:
-        return importlib.metadata.version("kaidoku-pdf")
-    except importlib.metadata.PackageNotFoundError:  # pragma: no cover
-        return "dev"
+from ._version import _get_version
 
 
 def _create_parser() -> argparse.ArgumentParser:
@@ -50,15 +44,26 @@ def main() -> None:
     parser = _create_parser()
     args = parser.parse_args()
 
+    if args.output_path.exists() and sys.stdin.isatty():
+        answer = input(f"{args.output_path} は既に存在します。上書きしますか？ [y/N]: ")
+        if answer.lower() not in ("y", "yes"):
+            print("中止しました。", file=sys.stderr)
+            sys.exit(1)
+
     def _progress(message: str) -> None:
-        print(message, flush=True)
+        print(f"\r{message}", end="", flush=True)
 
     try:
         create_searchable_pdf(args.input_path, args.output_path, progress_callback=_progress)
     except FileNotFoundError as exc:
-        parser.error(f"ファイルが見つかりません: {exc}")
+        print(f"\nエラー: ファイルが見つかりません: {exc}", file=sys.stderr)
+        sys.exit(1)
     except OCRConversionError as exc:
-        parser.error(str(exc))
+        print(f"\nエラー: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    print()
+    print(f"完了: {args.output_path}")
 
 
 if __name__ == "__main__":
