@@ -27,6 +27,8 @@ dev = [
     "pytest-cov",
     "pre-commit",
     "mypy",
+    "bandit",
+    "pip-audit",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -46,6 +48,10 @@ addopts = "--cov=image_pdf_ocr --cov-report=term-missing --cov-fail-under=75"
 markers = [
     "skipif: conditionally skip tests",
 ]
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101"]
 
 [tool.mypy]
 python_version = "3.10"

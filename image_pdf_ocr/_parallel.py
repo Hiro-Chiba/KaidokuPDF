@@ -239,7 +239,8 @@ def _run_with_pool(
     if bytes_worker is None:
         raise ValueError(f"未登録のworker関数です: {worker_fn}")
 
-    with ProcessPoolExecutor(max_workers=max_workers, initializer=_worker_initializer) as executor:
+    executor = ProcessPoolExecutor(max_workers=max_workers, initializer=_worker_initializer)
+    try:
         future_to_index = {
             executor.submit(bytes_worker, _image_to_bytes(img)): idx
             for idx, img in enumerate(images)
@@ -247,8 +248,7 @@ def _run_with_pool(
 
         for future in as_completed(future_to_index):
             if cancel_event and cancel_event.is_set():
-                for f in future_to_index:
-                    f.cancel()
+                executor.shutdown(wait=False, cancel_futures=True)
                 raise OCRCancelledError("処理がキャンセルされました。")
 
             idx = future_to_index[future]
@@ -257,5 +257,12 @@ def _run_with_pool(
 
             if progress_callback:
                 progress_callback(completed_count, total)
+    except OCRCancelledError:
+        raise
+    except BaseException:
+        executor.shutdown(wait=False, cancel_futures=True)
+        raise
+    else:
+        executor.shutdown(wait=True)
 
     return [results[i] for i in range(total)]

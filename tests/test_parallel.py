@@ -320,6 +320,70 @@ class TestOcrWorkerWithTextBytes:
         assert "hello" in text
 
 
+class TestRunWithPoolCancel:
+    @patch("image_pdf_ocr._parallel.ProcessPoolExecutor")
+    def test_shutdown_called_on_cancel(self, mock_pool_class):
+        """キャンセル時にshutdown(cancel_futures=True)が呼ばれる。"""
+        cancel_event = Event()
+        mock_executor = MagicMock()
+        mock_pool_class.return_value = mock_executor
+
+        dummy_future = MagicMock()
+        dummy_future.result.return_value = ("result", [{"text": "a"}])
+        mock_executor.submit.return_value = dummy_future
+
+        # as_completed が呼ばれたときに cancel_event をセットしてからfutureを返す
+        def fake_as_completed(futures):
+            cancel_event.set()
+            yield from futures
+
+        with patch("image_pdf_ocr._parallel.as_completed", side_effect=fake_as_completed):
+            images = [Image.new("RGB", (50, 50))]
+            with pytest.raises(OCRCancelledError):
+                _run_with_pool(images, _ocr_worker, cancel_event, None)
+
+        mock_executor.shutdown.assert_called_once_with(wait=False, cancel_futures=True)
+
+    @patch("image_pdf_ocr._parallel.ProcessPoolExecutor")
+    def test_shutdown_called_on_exception(self, mock_pool_class):
+        """例外発生時にshutdown(cancel_futures=True)が呼ばれる。"""
+        mock_executor = MagicMock()
+        mock_pool_class.return_value = mock_executor
+
+        dummy_future = MagicMock()
+        dummy_future.result.side_effect = RuntimeError("worker error")
+        mock_executor.submit.return_value = dummy_future
+
+        def fake_as_completed(futures):
+            yield from futures
+
+        with patch("image_pdf_ocr._parallel.as_completed", side_effect=fake_as_completed):
+            images = [Image.new("RGB", (50, 50))]
+            with pytest.raises(RuntimeError, match="worker error"):
+                _run_with_pool(images, _ocr_worker, None, None)
+
+        mock_executor.shutdown.assert_called_once_with(wait=False, cancel_futures=True)
+
+    @patch("image_pdf_ocr._parallel.ProcessPoolExecutor")
+    def test_normal_shutdown_wait_true(self, mock_pool_class):
+        """正常完了時にshutdown(wait=True)が呼ばれる。"""
+        mock_executor = MagicMock()
+        mock_pool_class.return_value = mock_executor
+
+        dummy_future = MagicMock()
+        dummy_future.result.return_value = ("result", [{"text": "a"}])
+        mock_executor.submit.return_value = dummy_future
+
+        def fake_as_completed(futures):
+            yield from futures
+
+        with patch("image_pdf_ocr._parallel.as_completed", side_effect=fake_as_completed):
+            images = [Image.new("RGB", (50, 50))]
+            _run_with_pool(images, _ocr_worker, None, None)
+
+        mock_executor.shutdown.assert_called_once_with(wait=True)
+
+
 class TestRunWithPool:
     def test_unknown_worker_raises_value_error(self):
         def fake_worker(img):
