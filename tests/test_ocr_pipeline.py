@@ -10,13 +10,13 @@ import pandas as pd
 import pytest
 from PIL import Image
 
-from image_pdf_ocr.ocr import (
-    OCRConversionError,
-    _find_japanese_font_path,
+from image_pdf_ocr._engine import (
     _perform_adaptive_ocr,
     _preprocess_for_ocr,
     _run_ocr_with_best_config,
 )
+from image_pdf_ocr._environment import _find_japanese_font_path
+from image_pdf_ocr._exceptions import OCRConversionError
 
 
 def _make_conf_frame(conf_value: float) -> pd.DataFrame:
@@ -142,7 +142,7 @@ class TestPreprocessForOcr:
 
     def test_scale_matches_upscale_factor(self) -> None:
         """scale値が _UPSCALE_FACTOR と一致すること。"""
-        from image_pdf_ocr.ocr import _UPSCALE_FACTOR
+        from image_pdf_ocr._engine import _UPSCALE_FACTOR
 
         image = Image.new("RGB", (200, 100), "white")
         _, scale = _preprocess_for_ocr(image)
@@ -156,7 +156,7 @@ class TestPreprocessForOcr:
 
     def test_output_dimensions_are_scaled(self) -> None:
         """出力画像の寸法がスケーリングされていること。"""
-        from image_pdf_ocr.ocr import _UPSCALE_FACTOR
+        from image_pdf_ocr._engine import _UPSCALE_FACTOR
 
         image = Image.new("RGB", (200, 100), "white")
         result_image, _ = _preprocess_for_ocr(image)

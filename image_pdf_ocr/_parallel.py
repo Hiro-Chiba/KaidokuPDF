@@ -71,9 +71,9 @@ def _reconstruct_text_from_frame(frame: pd.DataFrame) -> str:
     prev_par = -1
     prev_line = -1
 
-    for _, row in frame.iterrows():
-        text_val = str(row.get("text", "")).strip()
-        conf = row.get("conf", -1)
+    for row in frame.itertuples(index=False):
+        text_val = str(getattr(row, "text", "")).strip()
+        conf = getattr(row, "conf", -1)
         try:
             conf = float(conf)
         except (TypeError, ValueError):
@@ -81,9 +81,9 @@ def _reconstruct_text_from_frame(frame: pd.DataFrame) -> str:
         if conf < 0 or not text_val:
             continue
 
-        block = row.get("block_num", -1)
-        par = row.get("par_num", -1)
-        line = row.get("line_num", -1)
+        block = getattr(row, "block_num", -1)
+        par = getattr(row, "par_num", -1)
+        line = getattr(row, "line_num", -1)
 
         if prev_block != -1 and (block != prev_block or par != prev_par):
             if current_line_words:
@@ -108,14 +108,16 @@ def _reconstruct_text_from_frame(frame: pd.DataFrame) -> str:
 
 def _ocr_worker_bytes(image_data: bytes) -> tuple[AdaptiveOCRResult, list[dict]]:
     """バイト列から画像を復元してOCR + 信頼度フィルタリングを実行する。"""
-    image = Image.open(io.BytesIO(image_data))
-    return _ocr_worker(image)
+    with io.BytesIO(image_data) as buf:
+        image = Image.open(buf)
+        return _ocr_worker(image)
 
 
 def _ocr_worker_with_text_bytes(image_data: bytes) -> tuple[AdaptiveOCRResult, str]:
     """バイト列から画像を復元してOCR + テキスト抽出を実行する。"""
-    image = Image.open(io.BytesIO(image_data))
-    return _ocr_worker_with_text(image)
+    with io.BytesIO(image_data) as buf:
+        image = Image.open(buf)
+        return _ocr_worker_with_text(image)
 
 
 def _ocr_worker_with_text(image: Image.Image) -> tuple[AdaptiveOCRResult, str]:
@@ -214,9 +216,9 @@ _BYTES_WORKER_MAP: dict[Callable, Callable] = {
 
 def _image_to_bytes(image: Image.Image) -> bytes:
     """PIL ImageをPPMバイト列に変換する（pickle回避用）。"""
-    buf = io.BytesIO()
-    image.save(buf, format="PPM")
-    return buf.getvalue()
+    with io.BytesIO() as buf:
+        image.save(buf, format="PPM")
+        return buf.getvalue()
 
 
 def _run_with_pool(

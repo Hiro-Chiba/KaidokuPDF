@@ -8,12 +8,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from image_pdf_ocr.ocr import (
-    OCRCancelledError,
-    OCRConversionError,
-    _prepare_output_path,
-    extract_text_to_file,
-)
+from image_pdf_ocr._exceptions import OCRCancelledError, OCRConversionError
+from image_pdf_ocr._pdf import extract_text_to_file
+from image_pdf_ocr._utils import _prepare_output_path
 
 
 class TestPrepareOutputPath:

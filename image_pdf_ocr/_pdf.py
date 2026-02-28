@@ -23,6 +23,50 @@ from ._utils import _build_progress_message, _extract_coordinates, _prepare_outp
 Image.MAX_IMAGE_PIXELS = 200_000_000
 
 
+def _extract_page_images(
+    doc: fitz.Document,
+    start: int,
+    end: int,
+    cancel_event: Event | None,
+) -> list[Image.Image]:
+    """ドキュメントから指定範囲のページをPIL画像として抽出する。"""
+    images: list[Image.Image] = []
+    for page_idx in range(start, end):
+        if cancel_event and cancel_event.is_set():
+            raise OCRCancelledError("処理がキャンセルされました。")
+        page = doc[page_idx]
+        pix = page.get_pixmap(dpi=_PDF_RENDER_DPI)
+        with io.BytesIO(pix.tobytes("ppm")) as image_bytes:
+            pil_image = Image.open(image_bytes)
+            images.append(pil_image.copy())
+            pil_image.close()
+    return images
+
+
+def _extract_page_images_with_meta(
+    doc: fitz.Document,
+    start: int,
+    end: int,
+    cancel_event: Event | None,
+) -> tuple[list[Image.Image], list[fitz.Pixmap], list[fitz.Rect]]:
+    """ドキュメントからページ画像+Pixmap+Rectを抽出する（PDF組み立て用）。"""
+    images: list[Image.Image] = []
+    pixmaps: list[fitz.Pixmap] = []
+    page_rects: list[fitz.Rect] = []
+    for page_idx in range(start, end):
+        if cancel_event and cancel_event.is_set():
+            raise OCRCancelledError("処理がキャンセルされました。")
+        page = doc[page_idx]
+        pix = page.get_pixmap(dpi=_PDF_RENDER_DPI)
+        pixmaps.append(pix)
+        page_rects.append(page.rect)
+        with io.BytesIO(pix.tobytes("ppm")) as image_bytes:
+            pil_image = Image.open(image_bytes)
+            images.append(pil_image.copy())
+            pil_image.close()
+    return images, pixmaps, page_rects
+
+
 def remove_pdf_password(
     input_path: str | Path,
     output_path: str | Path,
@@ -121,20 +165,9 @@ def create_searchable_pdf(
                 chunk_end = min(chunk_start + chunk_size, total_pages)
 
                 # Phase A: チャンク分のページ画像抽出
-                pil_images: list[Image.Image] = []
-                pixmaps: list[fitz.Pixmap] = []
-                page_rects: list[fitz.Rect] = []
-
-                for page_idx in range(chunk_start, chunk_end):
-                    _check_cancellation()
-                    page = input_doc[page_idx]
-                    pix = page.get_pixmap(dpi=_PDF_RENDER_DPI)
-                    pixmaps.append(pix)
-                    page_rects.append(page.rect)
-                    image_bytes = io.BytesIO(pix.tobytes("ppm"))
-                    pil_image = Image.open(image_bytes)
-                    pil_images.append(pil_image.copy())
-                    pil_image.close()
+                pil_images, pixmaps, page_rects = _extract_page_images_with_meta(
+                    input_doc, chunk_start, chunk_end, cancel_event
+                )
 
                 # Phase B: チャンク分の並列OCR
                 def _ocr_progress(completed: int, total: int, _base: int = completed_pages) -> None:
@@ -362,9 +395,9 @@ def create_searchable_pdf_from_images(
                     _check_cancellation()
                     page = output_doc.new_page(width=width_pt, height=height_pt)
 
-                    image_buffer = io.BytesIO()
-                    prepared_image.save(image_buffer, format="PPM")
-                    page.insert_image(page_rect, stream=image_buffer.getvalue())
+                    with io.BytesIO() as image_buffer:
+                        prepared_image.save(image_buffer, format="PPM")
+                        page.insert_image(page_rect, stream=image_buffer.getvalue())
 
                     for row in filtered_rows:
                         text_val = str(row.get("text", "")).strip()
@@ -453,15 +486,7 @@ def extract_text_from_image_pdf(
                 chunk_end = min(chunk_start + chunk_size, total_pages)
 
                 # Phase A: チャンク分のページ画像抽出
-                pil_images: list[Image.Image] = []
-                for page_idx in range(chunk_start, chunk_end):
-                    _check_cancellation()
-                    page = document[page_idx]
-                    pix = page.get_pixmap(dpi=_PDF_RENDER_DPI)
-                    image_bytes = io.BytesIO(pix.tobytes("ppm"))
-                    pil_image = Image.open(image_bytes)
-                    pil_images.append(pil_image.copy())
-                    pil_image.close()
+                pil_images = _extract_page_images(document, chunk_start, chunk_end, cancel_event)
 
                 # Phase B: チャンク分の並列OCR + テキスト抽出
                 def _ocr_progress(completed: int, total: int, _base: int = completed_pages) -> None:

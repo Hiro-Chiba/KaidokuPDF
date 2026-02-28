@@ -120,3 +120,107 @@ class TestExtractMainOverwrite:
             mock_stdin.isatty.return_value = True
             extract_main()
         assert exc_info.value.code == 1
+
+    def test_overwrite_prompt_accept(self, tmp_path):
+        existing = tmp_path / "output.txt"
+        existing.write_text("dummy")
+        with (
+            patch(
+                "sys.argv",
+                ["prog", "--input", str(tmp_path / "in.pdf"), "--output", str(existing)],
+            ),
+            patch("sys.stdin") as mock_stdin,
+            patch("builtins.input", return_value="y"),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            mock_stdin.isatty.return_value = True
+            extract_main()
+        # FileNotFoundError → sys.exit(1)
+        assert exc_info.value.code == 1
+
+
+class TestConvertMainNonTTY:
+    def test_no_prompt_when_not_tty(self, tmp_path):
+        """非TTY時は上書き確認をスキップしてそのまま処理に進む。"""
+        existing = tmp_path / "output.pdf"
+        existing.write_text("dummy")
+        with (
+            patch(
+                "sys.argv",
+                ["prog", "--input", str(tmp_path / "in.pdf"), "--output", str(existing)],
+            ),
+            patch("sys.stdin") as mock_stdin,
+            patch("builtins.input") as mock_input,
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            mock_stdin.isatty.return_value = False
+            convert_main()
+        # 上書き確認なしで処理に進む（FileNotFoundError → exit(1)）
+        mock_input.assert_not_called()
+        assert exc_info.value.code == 1
+
+
+class TestExtractMainNonTTY:
+    def test_no_prompt_when_not_tty(self, tmp_path):
+        """非TTY時は上書き確認をスキップしてそのまま処理に進む。"""
+        existing = tmp_path / "output.txt"
+        existing.write_text("dummy")
+        with (
+            patch(
+                "sys.argv",
+                ["prog", "--input", str(tmp_path / "in.pdf"), "--output", str(existing)],
+            ),
+            patch("sys.stdin") as mock_stdin,
+            patch("builtins.input") as mock_input,
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            mock_stdin.isatty.return_value = False
+            extract_main()
+        mock_input.assert_not_called()
+        assert exc_info.value.code == 1
+
+
+class TestConvertMainErrors:
+    def test_file_not_found_error(self, tmp_path, capsys):
+        """FileNotFoundError時にstderrにメッセージが出力される。"""
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "prog",
+                    "--input",
+                    str(tmp_path / "missing.pdf"),
+                    "--output",
+                    str(tmp_path / "out.pdf"),
+                ],
+            ),
+            patch("image_pdf_ocr._pdf.find_and_set_tesseract_path", return_value=True),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            convert_main()
+        assert exc_info.value.code == 1
+        captured = capsys.readouterr()
+        assert "ファイルが見つかりません" in captured.err
+
+
+class TestExtractMainErrors:
+    def test_file_not_found_error(self, tmp_path, capsys):
+        """FileNotFoundError時にstderrにメッセージが出力される。"""
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "prog",
+                    "--input",
+                    str(tmp_path / "missing.pdf"),
+                    "--output",
+                    str(tmp_path / "out.txt"),
+                ],
+            ),
+            patch("image_pdf_ocr._pdf.find_and_set_tesseract_path", return_value=True),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            extract_main()
+        assert exc_info.value.code == 1
+        captured = capsys.readouterr()
+        assert "ファイルが見つかりません" in captured.err

@@ -52,7 +52,10 @@ def main() -> None:
             sys.exit(1)
 
     def _progress(message: str) -> None:
-        print(f"\r{message}", end="", flush=True)
+        if sys.stdout.isatty():
+            print(f"\r{message}", end="", flush=True)
+        else:
+            print(message, flush=True)
 
     try:
         extract_text_to_file(args.input_path, args.output_path, progress_callback=_progress)

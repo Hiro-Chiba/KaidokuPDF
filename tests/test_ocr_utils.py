@@ -6,16 +6,18 @@ from pathlib import Path
 
 import pandas as pd
 
-from image_pdf_ocr.ocr import (
-    _build_progress_message,
+from image_pdf_ocr._engine import (
     _build_tesseract_configs,
-    _candidate_font_directories,
     _compute_average_confidence,
-    _extract_coordinates,
     _filter_frame_by_confidence,
-    _format_duration,
     _prepare_frame,
     _sanitize_tesseract_config,
+)
+from image_pdf_ocr._environment import _candidate_font_directories
+from image_pdf_ocr._utils import (
+    _build_progress_message,
+    _extract_coordinates,
+    _format_duration,
 )
 
 

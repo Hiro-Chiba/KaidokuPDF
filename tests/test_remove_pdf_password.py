@@ -7,7 +7,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from image_pdf_ocr.ocr import PDFPasswordRemovalError, remove_pdf_password
+from image_pdf_ocr._exceptions import PDFPasswordRemovalError
+from image_pdf_ocr._pdf import remove_pdf_password
 
 
 class TestRemovePdfPassword:
