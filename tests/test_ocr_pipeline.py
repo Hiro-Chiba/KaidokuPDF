@@ -42,7 +42,7 @@ def _make_conf_frame(conf_value: float) -> pd.DataFrame:
 class TestRunOcrWithBestConfig:
     """_run_ocr_with_best_config のテスト。"""
 
-    @patch("image_pdf_ocr.ocr._image_to_data")
+    @patch("image_pdf_ocr._engine._image_to_data")
     def test_returns_best_confidence_result(self, mock_itd: MagicMock) -> None:
         """複数PSM試行で最高信頼度の結果を返す。"""
         low_frame = _make_conf_frame(40.0)
@@ -55,8 +55,8 @@ class TestRunOcrWithBestConfig:
         assert average == pytest.approx(80.0)
         assert len(frame) == 2
 
-    @patch("image_pdf_ocr.ocr._build_tesseract_configs", return_value=("--oem 1 --psm 6",))
-    @patch("image_pdf_ocr.ocr._image_to_data")
+    @patch("image_pdf_ocr._engine._build_tesseract_configs", return_value=("--oem 1 --psm 6",))
+    @patch("image_pdf_ocr._engine._image_to_data")
     def test_single_config(self, mock_itd: MagicMock, _mock_btc: MagicMock) -> None:
         """単一設定の場合でも正常に動作する。"""
         mock_itd.return_value = _make_conf_frame(70.0)
@@ -64,14 +64,14 @@ class TestRunOcrWithBestConfig:
         _frame, average = _run_ocr_with_best_config(image)
         assert average == pytest.approx(70.0)
 
-    @patch("image_pdf_ocr.ocr._image_to_data")
+    @patch("image_pdf_ocr._engine._image_to_data")
     def test_early_stop(self, mock_itd: MagicMock) -> None:
         """信頼度が _EARLY_STOP_CONFIDENCE 以上なら早期打ち止め。"""
         high_frame = _make_conf_frame(95.0)
         mock_itd.return_value = high_frame
 
         with patch(
-            "image_pdf_ocr.ocr._build_tesseract_configs",
+            "image_pdf_ocr._engine._build_tesseract_configs",
             return_value=("--psm 6", "--psm 11", "--psm 3", "--psm 4"),
         ):
             image = Image.new("RGB", (100, 100), "white")
@@ -79,7 +79,7 @@ class TestRunOcrWithBestConfig:
 
         assert mock_itd.call_count == 1
 
-    @patch("image_pdf_ocr.ocr._build_tesseract_configs", return_value=())
+    @patch("image_pdf_ocr._engine._build_tesseract_configs", return_value=())
     def test_no_configs_returns_empty(self, _mock_btc: MagicMock) -> None:
         """設定が空の場合は空DataFrameと0.0を返す。"""
         image = Image.new("RGB", (100, 100), "white")
@@ -91,7 +91,7 @@ class TestRunOcrWithBestConfig:
 class TestPerformAdaptiveOcr:
     """_perform_adaptive_ocr のテスト。"""
 
-    @patch("image_pdf_ocr.ocr._run_ocr_with_best_config")
+    @patch("image_pdf_ocr._engine._run_ocr_with_best_config")
     def test_high_confidence_skips_preprocessing(self, mock_run: MagicMock) -> None:
         """信頼度が高い場合は前処理をスキップする。"""
         mock_run.return_value = (_make_conf_frame(80.0), 80.0)
@@ -103,7 +103,7 @@ class TestPerformAdaptiveOcr:
         assert result.average_confidence == pytest.approx(80.0)
         mock_run.assert_called_once()
 
-    @patch("image_pdf_ocr.ocr._run_ocr_with_best_config")
+    @patch("image_pdf_ocr._engine._run_ocr_with_best_config")
     def test_low_confidence_triggers_preprocessing(self, mock_run: MagicMock) -> None:
         """信頼度が低い場合は前処理を実行する。"""
         low_frame = _make_conf_frame(30.0)
@@ -117,7 +117,7 @@ class TestPerformAdaptiveOcr:
         assert result.average_confidence == pytest.approx(70.0)
         assert mock_run.call_count == 2
 
-    @patch("image_pdf_ocr.ocr._run_ocr_with_best_config")
+    @patch("image_pdf_ocr._engine._run_ocr_with_best_config")
     def test_preprocessing_not_better_keeps_original(self, mock_run: MagicMock) -> None:
         """前処理しても改善しない場合は元の結果を返す。"""
         frame = _make_conf_frame(40.0)
@@ -170,7 +170,7 @@ class TestFindJapaneseFontPath:
 
     def test_env_ocr_jpn_font_found(self, tmp_path: Path) -> None:
         """環境変数 OCR_JPN_FONT 指定時にそのパスを返す。"""
-        import image_pdf_ocr.ocr as ocr_module
+        import image_pdf_ocr._environment as ocr_module
 
         font_file = tmp_path / "test_font.ttf"
         font_file.write_bytes(b"fake font data")
@@ -186,7 +186,7 @@ class TestFindJapaneseFontPath:
 
     def test_font_not_found_raises_error(self) -> None:
         """フォント未発見 → OCRConversionError。"""
-        import image_pdf_ocr.ocr as ocr_module
+        import image_pdf_ocr._environment as ocr_module
 
         original_cache = ocr_module._FONT_PATH_CACHE
         ocr_module._FONT_PATH_CACHE = None
@@ -196,7 +196,7 @@ class TestFindJapaneseFontPath:
                 patch.object(Path, "exists", return_value=False),
                 patch.object(Path, "is_file", return_value=False),
                 patch(
-                    "image_pdf_ocr.ocr._candidate_font_directories",
+                    "image_pdf_ocr._environment._candidate_font_directories",
                     return_value=[],
                 ),
                 patch.dict(os.environ, {"OCR_JPN_FONT": ""}, clear=False),
@@ -213,7 +213,7 @@ class TestFindJapaneseFontPath:
 
     def test_cached_font_path_returned(self, tmp_path: Path) -> None:
         """キャッシュされたフォントパスがそのまま返る。"""
-        import image_pdf_ocr.ocr as ocr_module
+        import image_pdf_ocr._environment as ocr_module
 
         font_file = tmp_path / "cached_font.ttf"
         font_file.write_bytes(b"fake font data")

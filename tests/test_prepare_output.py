@@ -46,8 +46,8 @@ class TestPrepareOutputPath:
 class TestExtractTextToFile:
     """extract_text_to_file のテスト。"""
 
-    @patch("image_pdf_ocr.ocr.extract_text_from_image_pdf")
-    @patch("image_pdf_ocr.ocr._prepare_output_path")
+    @patch("image_pdf_ocr._pdf.extract_text_from_image_pdf")
+    @patch("image_pdf_ocr._pdf._prepare_output_path")
     def test_normal_writes_text(
         self,
         mock_prepare: MagicMock,
@@ -63,7 +63,7 @@ class TestExtractTextToFile:
         assert output.read_text(encoding="utf-8") == "抽出されたテキスト\n"
         mock_extract.assert_called_once()
 
-    @patch("image_pdf_ocr.ocr.extract_text_from_image_pdf")
+    @patch("image_pdf_ocr._pdf.extract_text_from_image_pdf")
     def test_cancel_raises_error(self, mock_extract: MagicMock, tmp_path: Path) -> None:
         """キャンセル → OCRCancelledError。"""
         mock_extract.return_value = "テスト\n"
@@ -74,8 +74,8 @@ class TestExtractTextToFile:
         with pytest.raises(OCRCancelledError, match="キャンセル"):
             extract_text_to_file("dummy.pdf", output, cancel_event=cancel)
 
-    @patch("image_pdf_ocr.ocr.extract_text_from_image_pdf")
-    @patch("image_pdf_ocr.ocr._prepare_output_path")
+    @patch("image_pdf_ocr._pdf.extract_text_from_image_pdf")
+    @patch("image_pdf_ocr._pdf._prepare_output_path")
     def test_permission_error_raises_ocr_error(
         self,
         mock_prepare: MagicMock,
@@ -92,8 +92,8 @@ class TestExtractTextToFile:
         ):
             extract_text_to_file("dummy.pdf", output)
 
-    @patch("image_pdf_ocr.ocr.extract_text_from_image_pdf")
-    @patch("image_pdf_ocr.ocr._prepare_output_path")
+    @patch("image_pdf_ocr._pdf.extract_text_from_image_pdf")
+    @patch("image_pdf_ocr._pdf._prepare_output_path")
     def test_os_error_raises_ocr_error(
         self,
         mock_prepare: MagicMock,
