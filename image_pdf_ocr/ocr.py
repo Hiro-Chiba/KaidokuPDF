@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import math
 import os
+import re
 import sys
 import time
 from collections.abc import Callable, Iterable, Sequence
@@ -31,7 +32,9 @@ class PDFPasswordRemovalError(RuntimeError):
     """PDFのパスワード解除に失敗したことを示す例外。"""
 
 
-_AVERAGE_CONFIDENCE_THRESHOLD = float(os.environ.get("OCR_CONFIDENCE_THRESHOLD", "65"))
+_AVERAGE_CONFIDENCE_THRESHOLD = max(
+    0.0, min(100.0, float(os.environ.get("OCR_CONFIDENCE_THRESHOLD", "65")))
+)
 _TEXT_RENDER_CONFIDENCE_THRESHOLD = 50.0
 _UPSCALE_FACTOR = 1.5
 _OCR_PSM_CANDIDATES = tuple(
@@ -39,7 +42,40 @@ _OCR_PSM_CANDIDATES = tuple(
     for psm in os.environ.get("OCR_PSM_CANDIDATES", "6,11").split(",")
     if psm.strip().isdigit()
 )
-_OCR_BASE_CONFIG = os.environ.get("OCR_TESSERACT_CONFIG", "--oem 1")
+_SHELL_META_CHARS = re.compile(r"[;&|`$(){}<>!\\\"'\n\r]")
+_ALLOWED_TESSERACT_FLAGS = frozenset({"--oem", "--psm", "--dpi", "-l", "--tessdata-dir"})
+
+
+def _sanitize_tesseract_config(raw: str) -> str:
+    """Tesseract設定文字列をホワイトリストで検証し、安全なトークンのみ残す。"""
+
+    if not raw:
+        return ""
+
+    tokens = raw.split()
+    sanitized: list[str] = []
+
+    i = 0
+    while i < len(tokens):
+        token = tokens[i]
+        if _SHELL_META_CHARS.search(token):
+            i += 1
+            continue
+        if token in _ALLOWED_TESSERACT_FLAGS:
+            sanitized.append(token)
+            if i + 1 < len(tokens) and not tokens[i + 1].startswith("-"):
+                value = tokens[i + 1]
+                if not _SHELL_META_CHARS.search(value):
+                    sanitized.append(value)
+                i += 2
+                continue
+        i += 1
+
+    return " ".join(sanitized)
+
+
+_EARLY_STOP_CONFIDENCE = 90.0
+_OCR_BASE_CONFIG = _sanitize_tesseract_config(os.environ.get("OCR_TESSERACT_CONFIG", "--oem 1"))
 _FONT_PATH_CACHE: Path | None = None
 
 
@@ -79,6 +115,8 @@ def _run_ocr_with_best_config(image: Image.Image) -> tuple[pd.DataFrame, float]:
         if average > best_average:
             best_average = average
             best_frame = frame
+        if best_average >= _EARLY_STOP_CONFIDENCE:
+            break
 
     if best_frame is None:
         return pd.DataFrame(), 0.0
@@ -362,7 +400,9 @@ def _candidate_font_directories() -> list[Path]:
     for env_name in ("OCR_JPN_FONT_DIR", "OCR_FONT_DIR"):
         env_value = os.environ.get(env_name)
         if env_value:
-            dirs.append(Path(env_value).expanduser())
+            resolved = Path(env_value).expanduser().resolve()
+            if resolved.is_dir():
+                dirs.append(resolved)
 
     home = Path.home()
     dirs.extend(
@@ -524,7 +564,7 @@ def create_searchable_pdf(
         for index, page in enumerate(input_doc, start=1):
             _check_cancellation()
             pix = page.get_pixmap(dpi=300)
-            image_bytes = io.BytesIO(pix.tobytes("png"))
+            image_bytes = io.BytesIO(pix.tobytes("ppm"))
             with Image.open(image_bytes) as pil_image:
                 ocr_result = _perform_adaptive_ocr(pil_image)
 
@@ -800,7 +840,7 @@ def extract_text_from_image_pdf(
         for index, page in enumerate(document, start=1):
             _check_cancellation()
             pix = page.get_pixmap(dpi=300)
-            image_bytes = io.BytesIO(pix.tobytes("png"))
+            image_bytes = io.BytesIO(pix.tobytes("ppm"))
             with Image.open(image_bytes) as pil_image:
                 ocr_result = _perform_adaptive_ocr(pil_image)
                 page_text = pytesseract.image_to_string(ocr_result.image_for_string, lang="jpn")

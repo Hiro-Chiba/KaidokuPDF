@@ -15,6 +15,7 @@ from image_pdf_ocr.ocr import (
     _filter_frame_by_confidence,
     _format_duration,
     _prepare_frame,
+    _sanitize_tesseract_config,
 )
 
 
@@ -174,3 +175,55 @@ class TestCandidateFontDirectories:
     def test_no_duplicates(self) -> None:
         dirs = _candidate_font_directories()
         assert len(dirs) == len(set(dirs))
+
+
+# ---------------------------------------------------------------------------
+# _sanitize_tesseract_config
+# ---------------------------------------------------------------------------
+class TestSanitizeTesseractConfig:
+    def test_normal_flags_pass_through(self) -> None:
+        assert _sanitize_tesseract_config("--oem 1") == "--oem 1"
+
+    def test_multiple_valid_flags(self) -> None:
+        assert _sanitize_tesseract_config("--oem 1 --psm 6") == "--oem 1 --psm 6"
+
+    def test_shell_injection_removed(self) -> None:
+        # "1;" はセミコロンを含むため値ごと除去される（安全側に倒す）
+        result = _sanitize_tesseract_config("--oem 1; rm -rf /")
+        assert result == "--oem"
+        # セミコロンなしで値が安全な場合は通過する
+        result2 = _sanitize_tesseract_config("--oem 1 --psm 6")
+        assert result2 == "--oem 1 --psm 6"
+
+    def test_pipe_injection_removed(self) -> None:
+        result = _sanitize_tesseract_config("--oem 1 | cat /etc/passwd")
+        assert result == "--oem 1"
+
+    def test_ampersand_injection_removed(self) -> None:
+        result = _sanitize_tesseract_config("--oem 1 && echo pwned")
+        assert result == "--oem 1"
+
+    def test_empty_string(self) -> None:
+        assert _sanitize_tesseract_config("") == ""
+
+    def test_unknown_flag_removed(self) -> None:
+        result = _sanitize_tesseract_config("--oem 1 --unknown-flag value")
+        assert result == "--oem 1"
+
+    def test_tessdata_dir_allowed(self) -> None:
+        result = _sanitize_tesseract_config("--tessdata-dir /usr/share/tessdata")
+        assert result == "--tessdata-dir /usr/share/tessdata"
+
+    def test_lang_flag_allowed(self) -> None:
+        assert _sanitize_tesseract_config("-l jpn") == "-l jpn"
+
+    def test_dpi_flag_allowed(self) -> None:
+        assert _sanitize_tesseract_config("--dpi 300") == "--dpi 300"
+
+    def test_backtick_injection_removed(self) -> None:
+        result = _sanitize_tesseract_config("--oem `whoami`")
+        assert result == "--oem"
+
+    def test_dollar_injection_removed(self) -> None:
+        result = _sanitize_tesseract_config("--oem $(cat /etc/passwd)")
+        assert result == "--oem"
