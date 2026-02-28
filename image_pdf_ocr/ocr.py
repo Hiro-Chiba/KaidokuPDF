@@ -29,6 +29,15 @@ from ._environment import (
     find_and_set_tesseract_path,
 )
 from ._exceptions import OCRCancelledError, OCRConversionError, PDFPasswordRemovalError
+from ._parallel import (
+    _get_max_workers,
+    _is_parallel_enabled,
+    _ocr_worker,
+    _ocr_worker_with_text,
+    _worker_initializer,
+    run_parallel_ocr,
+    run_parallel_ocr_with_text,
+)
 from ._pdf import (
     _determine_canvas_size,
     _normalize_image_for_canvas,
@@ -68,8 +77,12 @@ __all__ = [
     "_filter_frame_by_confidence",
     "_find_japanese_font_path",
     "_format_duration",
+    "_get_max_workers",
     "_image_to_data",
+    "_is_parallel_enabled",
     "_normalize_image_for_canvas",
+    "_ocr_worker",
+    "_ocr_worker_with_text",
     "_perform_adaptive_ocr",
     "_prepare_frame",
     "_prepare_output_path",
@@ -78,10 +91,13 @@ __all__ = [
     "_sanitize_tesseract_config",
     "_try_assign_candidates",
     "_validate_tesseract_setting",
+    "_worker_initializer",
     "create_searchable_pdf",
     "create_searchable_pdf_from_images",
     "extract_text_from_image_pdf",
     "extract_text_to_file",
     "find_and_set_tesseract_path",
     "remove_pdf_password",
+    "run_parallel_ocr",
+    "run_parallel_ocr_with_text",
 ]
