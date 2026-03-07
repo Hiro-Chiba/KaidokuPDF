@@ -1,6 +1,8 @@
-# Image PDF OCR Suite
+# KaidokuPDF
 
-画像ベースのPDFをOCRし、検索可能なPDF生成やテキスト抽出を行うシンプルなツールセットです。GUI（Tkinter）とCLIのどちらでも使えます。
+画像ベースのPDFをOCRし、検索可能なPDF生成やテキスト抽出を行うツールです。Webアプリ・デスクトップアプリ（Tkinter）・CLIの3通りで使えます。
+
+**[Webアプリを試す →](https://kaidokupdf.streamlit.app/)**
 
 ## できること
 - 画像PDFを検索可能なPDFに変換
@@ -46,7 +48,13 @@ pip install -e .
 
 ## 使い方
 
-### デスクトップアプリ（おすすめ）
+### Webアプリ（おすすめ）
+
+インストール不要で、ブラウザからすぐに使えます。
+
+**https://kaidokupdf.streamlit.app/**
+
+### デスクトップアプリ
 ```bash
 python ocr_desktop_app.py
 ```
