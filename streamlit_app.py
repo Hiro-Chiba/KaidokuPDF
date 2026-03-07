@@ -20,6 +20,16 @@ from image_pdf_ocr import (
 )
 
 MAX_FILE_SIZE_MB = 50
+_BYTES_PER_MB = 1024 * 1024
+_PDF_SUFFIX = ".pdf"
+_PDF_MIME = "application/pdf"
+_TEXT_MIME = "text/plain; charset=utf-8"
+_TEXT_ENCODING = "utf-8"
+_TEXT_AREA_HEIGHT = 400
+_ACCEPTED_FILE_TYPES = ["pdf"]
+_OUTPUT_SUFFIX_SEARCHABLE = "_searchable.pdf"
+_OUTPUT_SUFFIX_UNLOCKED = "_unlocked.pdf"
+_OUTPUT_SUFFIX_TEXT = ".txt"
 
 st.set_page_config(
     page_title="KaidokuPDF",
@@ -35,7 +45,7 @@ def _validate_upload(uploaded_file: object) -> bool:
     """アップロードファイルのサイズを検証する。"""
     if uploaded_file is None:
         return False
-    size_mb = uploaded_file.size / (1024 * 1024)  # type: ignore[union-attr]
+    size_mb = uploaded_file.size / _BYTES_PER_MB  # type: ignore[union-attr]
     if size_mb > MAX_FILE_SIZE_MB:
         st.error(f"ファイルサイズが上限 ({MAX_FILE_SIZE_MB}MB) を超えています。({size_mb:.1f}MB)")
         return False
@@ -69,7 +79,7 @@ with tab_convert:
     st.subheader("画像 PDF を検索可能な PDF に変換")
     convert_file = st.file_uploader(
         "PDF ファイルをアップロード",
-        type=["pdf"],
+        type=_ACCEPTED_FILE_TYPES,
         key="convert_upload",
     )
 
@@ -86,8 +96,8 @@ with tab_convert:
                 progress_bar.progress(pct)
 
         with (
-            tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp_in,
-            tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp_out,
+            tempfile.NamedTemporaryFile(suffix=_PDF_SUFFIX, delete=False) as tmp_in,
+            tempfile.NamedTemporaryFile(suffix=_PDF_SUFFIX, delete=False) as tmp_out,
         ):
             tmp_in.write(convert_file.getvalue())  # type: ignore[union-attr]
             tmp_in_path = tmp_in.name
@@ -105,12 +115,12 @@ with tab_convert:
             st.success("変換が完了しました。")
             result_data = Path(tmp_out_path).read_bytes()
             original_name = convert_file.name  # type: ignore[union-attr]
-            output_name = Path(original_name).stem + "_searchable.pdf"
+            output_name = Path(original_name).stem + _OUTPUT_SUFFIX_SEARCHABLE
             st.download_button(
                 label="変換済み PDF をダウンロード",
                 data=result_data,
                 file_name=output_name,
-                mime="application/pdf",
+                mime=_PDF_MIME,
                 key="convert_download",
             )
         except OCRConversionError as e:
@@ -124,7 +134,7 @@ with tab_extract:
     st.subheader("画像 PDF からテキストを抽出")
     extract_file = st.file_uploader(
         "PDF ファイルをアップロード",
-        type=["pdf"],
+        type=_ACCEPTED_FILE_TYPES,
         key="extract_upload",
     )
 
@@ -140,7 +150,7 @@ with tab_extract:
             if pct is not None:
                 progress_bar.progress(pct)
 
-        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp_in:
+        with tempfile.NamedTemporaryFile(suffix=_PDF_SUFFIX, delete=False) as tmp_in:
             tmp_in.write(extract_file.getvalue())  # type: ignore[union-attr]
             tmp_in_path = tmp_in.name
 
@@ -153,14 +163,14 @@ with tab_extract:
             progress_bar.progress(1.0)
             status_text.text("抽出完了!")
             st.success("テキスト抽出が完了しました。")
-            st.text_area("抽出されたテキスト", extracted_text, height=400)
+            st.text_area("抽出されたテキスト", extracted_text, height=_TEXT_AREA_HEIGHT)
             original_name = extract_file.name  # type: ignore[union-attr]
-            output_name = Path(original_name).stem + ".txt"
+            output_name = Path(original_name).stem + _OUTPUT_SUFFIX_TEXT
             st.download_button(
                 label="テキストファイルをダウンロード",
-                data=extracted_text.encode("utf-8"),
+                data=extracted_text.encode(_TEXT_ENCODING),
                 file_name=output_name,
-                mime="text/plain; charset=utf-8",
+                mime=_TEXT_MIME,
                 key="extract_download",
             )
         except OCRConversionError as e:
@@ -173,7 +183,7 @@ with tab_password:
     st.subheader("PDF のパスワードを解除")
     password_file = st.file_uploader(
         "パスワード付き PDF をアップロード",
-        type=["pdf"],
+        type=_ACCEPTED_FILE_TYPES,
         key="password_upload",
     )
     password_input = st.text_input(
@@ -187,8 +197,8 @@ with tab_password:
             st.warning("パスワードを入力してください。")
         elif _validate_upload(password_file):
             with (
-                tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp_in,
-                tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp_out,
+                tempfile.NamedTemporaryFile(suffix=_PDF_SUFFIX, delete=False) as tmp_in,
+                tempfile.NamedTemporaryFile(suffix=_PDF_SUFFIX, delete=False) as tmp_out,
             ):
                 tmp_in.write(password_file.getvalue())  # type: ignore[union-attr]
                 tmp_in_path = tmp_in.name
@@ -199,12 +209,12 @@ with tab_password:
                 st.success("パスワード解除が完了しました。")
                 result_data = Path(tmp_out_path).read_bytes()
                 original_name = password_file.name  # type: ignore[union-attr]
-                output_name = Path(original_name).stem + "_unlocked.pdf"
+                output_name = Path(original_name).stem + _OUTPUT_SUFFIX_UNLOCKED
                 st.download_button(
                     label="解除済み PDF をダウンロード",
                     data=result_data,
                     file_name=output_name,
-                    mime="application/pdf",
+                    mime=_PDF_MIME,
                     key="password_download",
                 )
             except PDFPasswordRemovalError as e:
